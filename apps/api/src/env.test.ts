@@ -34,4 +34,8 @@ describe("parseEnv", () => {
       expect(() => parseEnv({ PORT: port })).toThrow();
     },
   );
+
+  it("NODE_ENV が development / test / production 以外なら検証エラーを投げる", () => {
+    expect(() => parseEnv({ NODE_ENV: "staging" })).toThrow();
+  });
 });
