@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/biome-check.sh",
+            "timeout": 30,
+            "statusMessage": "Biome でフォーマットとリントを実行中"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typecheck.sh",
+            "timeout": 120,
+            "statusMessage": "型チェックを実行中"
+          }
+        ]
+      }
+    ]
+  }
+}
