@@ -37,5 +37,5 @@ Hono の学習用ハンズオン。チーム向けタスク管理API を TDD（`
 - テスト（全件）: `pnpm test`
 - テスト（ファイル指定）: `pnpm --filter @hono-handson/api test <ファイルパス>`
 - Lint / Format: `pnpm lint`（チェックのみ） / `pnpm format`（自動修正）
-- 型チェック: TBD
+- 型チェック: `pnpm typecheck`
 - 開発サーバー: TBD
