@@ -32,4 +32,23 @@ describe("errorHandler", () => {
       expect(await res.json()).toEqual({ error: { message } });
     },
   );
+
+  it.each([
+    { status: 401, message: "Unauthorized" },
+    { status: 404, message: "Not Found" },
+  ] as const)(
+    "message を指定しない HTTPException($status) には標準の文言 $message を返す",
+    async ({ status, message }) => {
+      const testApp = new Hono()
+        .get("/", () => {
+          throw new HTTPException(status);
+        })
+        .onError(errorHandler);
+
+      const res = await testApp.request("/");
+
+      expect(res.status).toBe(status);
+      expect(await res.json()).toEqual({ error: { message } });
+    },
+  );
 });
