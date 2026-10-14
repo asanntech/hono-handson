@@ -32,7 +32,7 @@ Hono の学習用ハンズオン。チーム向けタスク管理API を TDD（`
 <!-- 第0章（環境構築）で確定させてから記入する -->
 
 - 依存関係のインストール: `pnpm install`
-- DB の起動: TBD
+- DB の起動: `pnpm db:up`（停止は `pnpm db:down`）
 - マイグレーション: TBD
 - テスト（全件）: `pnpm test`
 - テスト（ファイル指定）: `pnpm --filter @hono-handson/api test <ファイルパス>`
