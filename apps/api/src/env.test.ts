@@ -20,4 +20,18 @@ describe("parseEnv", () => {
     expect(env.PORT).toBe(3000);
     expect(env.NODE_ENV).toBe("development");
   });
+
+  it.each([
+    ["1", 1],
+    ["65535", 65535],
+  ])("PORT が境界値 %j なら受け付ける", (port, expected) => {
+    expect(parseEnv({ PORT: port }).PORT).toBe(expected);
+  });
+
+  it.each(["abc", "", "0", "65536", "3000.5"])(
+    "PORT が %j なら検証エラーを投げる",
+    (port) => {
+      expect(() => parseEnv({ PORT: port })).toThrow();
+    },
+  );
 });
