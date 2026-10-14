@@ -51,4 +51,19 @@ describe("errorHandler", () => {
       expect(await res.json()).toEqual({ error: { message } });
     },
   );
+
+  it("想定外の例外には 500 と汎用の message を返し、例外の内容を含めない", async () => {
+    const testApp = new Hono()
+      .get("/", () => {
+        throw new Error("connection to db-host:5432 failed");
+      })
+      .onError(errorHandler);
+
+    const res = await testApp.request("/");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: { message: "Internal Server Error" },
+    });
+  });
 });

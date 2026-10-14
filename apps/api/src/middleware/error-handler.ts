@@ -11,5 +11,5 @@ export const errorHandler: ErrorHandler = (err, c) => {
     const message = err.message || STATUS_CODES[err.status] || "Error";
     return c.json({ error: { message } }, err.status);
   }
-  throw err;
+  return c.json({ error: { message: "Internal Server Error" } }, 500);
 };
