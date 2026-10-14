@@ -1,0 +1,5 @@
+{
+  "name": "@hono-handson/api",
+  "private": true,
+  "type": "module"
+}
