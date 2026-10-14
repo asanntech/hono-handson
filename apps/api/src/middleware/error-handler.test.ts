@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
 import { errorHandler } from "./error-handler.ts";
 
@@ -65,5 +65,19 @@ describe("errorHandler", () => {
     expect(await res.json()).toEqual({
       error: { message: "Internal Server Error" },
     });
+  });
+
+  it("想定外の例外はサーバーのログに出す", async () => {
+    const consoleError = vi.spyOn(console, "error");
+    const error = new Error("connection to db-host:5432 failed");
+    const testApp = new Hono()
+      .get("/", () => {
+        throw error;
+      })
+      .onError(errorHandler);
+
+    await testApp.request("/");
+
+    expect(consoleError).toHaveBeenCalledWith(error);
   });
 });
