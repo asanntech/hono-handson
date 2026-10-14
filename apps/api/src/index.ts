@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app.ts";
+import { env } from "./env.ts";
 
-serve({ fetch: app.fetch, port: 3000 }, (info) => {
+serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Listening on http://localhost:${info.port}`);
 });

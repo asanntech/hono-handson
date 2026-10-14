@@ -9,3 +9,5 @@ const envSchema = z.object({
 
 export const parseEnv = (source: Record<string, string | undefined>) =>
   envSchema.parse(source);
+
+export const env = parseEnv(process.env);
