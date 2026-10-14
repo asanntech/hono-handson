@@ -1,0 +1,39 @@
+name: hono-handson
+
+services:
+  db:
+    image: postgres:18-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hono_handson
+    # 開発用 DB は名前付きボリュームに置き、コンテナを作り直してもデータを残す
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hono_handson"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  db-test:
+    image: postgres:18-alpine
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hono_handson_test
+    # テスト用 DB はメモリ上に置き、再起動のたびに空にする
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hono_handson_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  db-data:

@@ -1,0 +1,20 @@
+{
+  "name": "hono-handson",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "dev": "pnpm --filter @hono-handson/api dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15"
+  }
+}
