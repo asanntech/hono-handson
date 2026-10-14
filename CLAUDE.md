@@ -27,6 +27,10 @@ Hono の学習用ハンズオン。チーム向けタスク管理API を TDD（`
 - 認証は JWT を HttpOnly Cookie に入れる方式で行う。認可はミドルウェアで行う
 - メンバーでないユーザーには `404` を返す
 
+## 禁止事項
+
+- 相対パスの import に `.js` 拡張子を付けない。`.ts` 拡張子で書く（例: `import { app } from "./app.ts"`）。tsx と Vitest で直接実行し、ビルドしないため（`tsconfig.json` の `allowImportingTsExtensions` で許可している）
+
 ## コマンド
 
 コマンドはルートの `package.json` の `scripts` を参照すること。補足:
