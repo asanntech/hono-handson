@@ -34,8 +34,8 @@ Hono の学習用ハンズオン。チーム向けタスク管理API を TDD（`
 - 依存関係のインストール: `pnpm install`
 - DB の起動: TBD
 - マイグレーション: TBD
-- テスト（全件）: TBD
-- テスト（ファイル指定）: TBD
+- テスト（全件）: `pnpm test`
+- テスト（ファイル指定）: `pnpm --filter @hono-handson/api test <ファイルパス>`
 - Lint / Format: TBD
 - 型チェック: TBD
 - 開発サーバー: TBD
