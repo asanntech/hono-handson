@@ -266,4 +266,11 @@ describe("GET /auth/me", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id, email: "alice@example.com" });
   });
+
+  it("Cookie を付けないと 401 と統一形式のエラーを返す", async () => {
+    const res = await app.request("/auth/me");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+  });
 });

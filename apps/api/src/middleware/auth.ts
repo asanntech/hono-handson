@@ -1,5 +1,6 @@
 import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
 import { verify } from "hono/jwt";
 import { env } from "../env.ts";
 
@@ -11,7 +12,10 @@ export type AuthVariables = { userId: string };
 
 export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(
   async (c, next) => {
-    const token = getCookie(c, TOKEN_COOKIE_NAME) ?? "";
+    const token = getCookie(c, TOKEN_COOKIE_NAME);
+    if (!token) {
+      throw new HTTPException(401);
+    }
     const payload = await verify(token, env.JWT_SECRET, "HS256");
     c.set("userId", payload.sub as string);
     await next();
