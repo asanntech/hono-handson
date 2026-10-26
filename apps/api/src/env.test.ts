@@ -11,6 +11,14 @@ describe("parseEnv", () => {
     expect(env.PORT).toBe(8080);
   });
 
+  it("JWT_SECRET が 32 文字以上ならその値を返す", () => {
+    const secret = "a".repeat(32);
+
+    const env = parseEnv({ ...requiredEnv, JWT_SECRET: secret });
+
+    expect(env.JWT_SECRET).toBe(secret);
+  });
+
   it("NODE_ENV が指定されるとその値を返す", () => {
     const env = parseEnv({ ...requiredEnv, NODE_ENV: "production" });
 
