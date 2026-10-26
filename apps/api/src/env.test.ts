@@ -17,9 +17,10 @@ describe("parseEnv", () => {
     expect(env.NODE_ENV).toBe("production");
   });
 
-  it("DATABASE_URL が指定されるとその値を返す", () => {
-    const url = "postgres://user:pass@localhost:5432/app";
-
+  it.each([
+    "postgres://user:pass@localhost:5432/app",
+    "postgresql://user:pass@localhost:5432/app",
+  ])("DATABASE_URL が %j ならその値を返す", (url) => {
     const env = parseEnv({ DATABASE_URL: url });
 
     expect(env.DATABASE_URL).toBe(url);
@@ -50,7 +51,7 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...requiredEnv, NODE_ENV: "staging" })).toThrow();
   });
 
-  it.each([undefined, "", "not-a-url"])(
+  it.each([undefined, "", "not-a-url", "http://localhost:5432/app"])(
     "DATABASE_URL が %j なら検証エラーを投げる",
     (url) => {
       expect(() => parseEnv({ DATABASE_URL: url })).toThrow();
