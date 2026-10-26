@@ -16,8 +16,14 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(
     if (!token) {
       throw new HTTPException(401);
     }
-    const payload = await verify(token, env.JWT_SECRET, "HS256");
-    c.set("userId", payload.sub as string);
+    // 署名の不一致・形式の誤り・期限切れでは verify が例外を投げる。どれも 401 にそろえる
+    const payload = await verify(token, env.JWT_SECRET, "HS256").catch(() => {
+      throw new HTTPException(401);
+    });
+    if (typeof payload.sub !== "string") {
+      throw new HTTPException(401);
+    }
+    c.set("userId", payload.sub);
     await next();
   },
 );

@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { verify } from "hono/jwt";
+import { sign, verify } from "hono/jwt";
 import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it } from "vitest";
 import { app } from "../../app.ts";
@@ -269,6 +269,63 @@ describe("GET /auth/me", () => {
 
   it("Cookie を付けないと 401 と統一形式のエラーを返す", async () => {
     const res = await app.request("/auth/me");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+  });
+
+  it.each([
+    {
+      case: "ペイロードを書き換えた JWT",
+      // 本人の JWT の署名を流用し、ペイロードだけを別のユーザー ID のものに差し替える
+      token: async (userId: string) => {
+        const exp = Math.floor(Date.now() / 1000) + 60;
+        const [header, , signature] = (
+          await sign({ sub: userId, exp }, env.JWT_SECRET, "HS256")
+        ).split(".");
+        const [, payload] = (
+          await sign(
+            { sub: "00000000-0000-0000-0000-000000000000", exp },
+            env.JWT_SECRET,
+            "HS256",
+          )
+        ).split(".");
+        return `${header}.${payload}.${signature}`;
+      },
+    },
+    {
+      case: "別の秘密鍵で署名した JWT",
+      token: (userId: string) =>
+        sign(
+          { sub: userId, exp: Math.floor(Date.now() / 1000) + 60 },
+          "another-secret-that-is-32-chars-long!!",
+          "HS256",
+        ),
+    },
+    { case: "JWT の形式でない文字列", token: async () => "not-a-jwt" },
+    {
+      case: "sub がない JWT",
+      token: () =>
+        sign(
+          { exp: Math.floor(Date.now() / 1000) + 60 },
+          env.JWT_SECRET,
+          "HS256",
+        ),
+    },
+  ])("$case の Cookie なら 401 を返す", async ({ token }) => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const { id } = await signupRes.json();
+
+    const res = await app.request("/auth/me", {
+      headers: { Cookie: `token=${await token(id)}` },
+    });
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
