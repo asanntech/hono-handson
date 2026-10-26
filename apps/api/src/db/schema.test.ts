@@ -22,4 +22,12 @@ describe("users テーブル", () => {
       },
     ]);
   });
+
+  it("同じメールアドレスのユーザーを 2 人保存しようとすると一意制約違反で失敗する", async () => {
+    await db.insert(users).values({ email: "alice@example.com" });
+
+    await expect(
+      db.insert(users).values({ email: "alice@example.com" }),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+  });
 });
