@@ -1,6 +1,6 @@
 import { getTableName, is, sql } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
-import { beforeEach } from "vitest";
+import { afterEach } from "vitest";
 import { db } from "../db/client.ts";
 import * as schema from "../db/schema.ts";
 
@@ -10,7 +10,7 @@ const tableNames = Object.values(schema)
   .map((table) => `"${getTableName(table)}"`)
   .join(", ");
 
-// 各テストの前にテーブルを空にし、前のテストのデータが漏れないようにする
-beforeEach(async () => {
+// 各テストの後にテーブルを空にし、次のテストにデータを漏らさない。実行後にもデータを残さない
+afterEach(async () => {
   await db.execute(sql.raw(`TRUNCATE ${tableNames}`));
 });
