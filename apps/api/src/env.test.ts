@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { parseEnv } from "./env.ts";
 
+// 必須の環境変数。ほかの項目を検証するテストで、入力に含めておく
+const requiredEnv = { DATABASE_URL: "postgres://user:pass@localhost:5432/app" };
+
 describe("parseEnv", () => {
   it("PORT が指定されると数値に変換して返す", () => {
-    const env = parseEnv({ PORT: "8080" });
+    const env = parseEnv({ ...requiredEnv, PORT: "8080" });
 
     expect(env.PORT).toBe(8080);
   });
 
   it("NODE_ENV が指定されるとその値を返す", () => {
-    const env = parseEnv({ NODE_ENV: "production" });
+    const env = parseEnv({ ...requiredEnv, NODE_ENV: "production" });
 
     expect(env.NODE_ENV).toBe("production");
   });
@@ -23,7 +26,7 @@ describe("parseEnv", () => {
   });
 
   it("PORT と NODE_ENV が未指定なら 3000 と development を既定値にする", () => {
-    const env = parseEnv({});
+    const env = parseEnv(requiredEnv);
 
     expect(env.PORT).toBe(3000);
     expect(env.NODE_ENV).toBe("development");
@@ -33,17 +36,24 @@ describe("parseEnv", () => {
     ["1", 1],
     ["65535", 65535],
   ])("PORT が境界値 %j なら受け付ける", (port, expected) => {
-    expect(parseEnv({ PORT: port }).PORT).toBe(expected);
+    expect(parseEnv({ ...requiredEnv, PORT: port }).PORT).toBe(expected);
   });
 
   it.each(["abc", "", "0", "65536", "3000.5"])(
     "PORT が %j なら検証エラーを投げる",
     (port) => {
-      expect(() => parseEnv({ PORT: port })).toThrow();
+      expect(() => parseEnv({ ...requiredEnv, PORT: port })).toThrow();
     },
   );
 
   it("NODE_ENV が development / test / production 以外なら検証エラーを投げる", () => {
-    expect(() => parseEnv({ NODE_ENV: "staging" })).toThrow();
+    expect(() => parseEnv({ ...requiredEnv, NODE_ENV: "staging" })).toThrow();
   });
+
+  it.each([undefined, "", "not-a-url"])(
+    "DATABASE_URL が %j なら検証エラーを投げる",
+    (url) => {
+      expect(() => parseEnv({ DATABASE_URL: url })).toThrow();
+    },
+  );
 });
