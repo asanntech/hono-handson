@@ -175,4 +175,40 @@ describe("POST /auth/login", () => {
     const payload = await verify(cookies[0].value, env.JWT_SECRET, "HS256");
     expect(payload.sub).toBe(id);
   });
+
+  // 未登録とパスワード違いを同じ応答にし、メールが登録済みかどうかを漏らさない
+  it.each([
+    {
+      case: "未登録のメール",
+      body: { email: "bob@example.com", password: "password123" },
+    },
+    {
+      case: "パスワード違い",
+      body: { email: "alice@example.com", password: "wrong-password" },
+    },
+  ])(
+    "$case なら 401 と共通の message を返し、Cookie を発行しない",
+    async ({ body }) => {
+      await app.request("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      });
+
+      const res = await app.request("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({
+        error: { message: "Invalid email or password" },
+      });
+      expect(res.headers.getSetCookie()).toEqual([]);
+    },
+  );
 });

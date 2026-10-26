@@ -41,6 +41,10 @@ export const login = async (input: { email: string; password: string }) => {
     .select()
     .from(users)
     .where(eq(users.email, input.email));
+  // 未登録とパスワード違いで同じ例外を投げ、どちらが原因かを区別させない
+  if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
+    throw new HTTPException(401, { message: "Invalid email or password" });
+  }
   return { id: user.id, email: user.email };
 };
 
