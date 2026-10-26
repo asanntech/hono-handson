@@ -302,6 +302,15 @@ describe("GET /auth/me", () => {
           "HS256",
         ),
     },
+    {
+      case: "有効期限が切れた JWT",
+      token: (userId: string) =>
+        sign(
+          { sub: userId, exp: Math.floor(Date.now() / 1000) - 1 },
+          env.JWT_SECRET,
+          "HS256",
+        ),
+    },
     { case: "JWT の形式でない文字列", token: async () => "not-a-jwt" },
     {
       case: "sub がない JWT",
