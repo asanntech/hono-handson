@@ -14,6 +14,14 @@ describe("parseEnv", () => {
     expect(env.NODE_ENV).toBe("production");
   });
 
+  it("DATABASE_URL が指定されるとその値を返す", () => {
+    const url = "postgres://user:pass@localhost:5432/app";
+
+    const env = parseEnv({ DATABASE_URL: url });
+
+    expect(env.DATABASE_URL).toBe(url);
+  });
+
   it("PORT と NODE_ENV が未指定なら 3000 と development を既定値にする", () => {
     const env = parseEnv({});
 
