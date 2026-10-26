@@ -211,4 +211,37 @@ describe("POST /auth/login", () => {
       expect(res.headers.getSetCookie()).toEqual([]);
     },
   );
+
+  it.each([
+    {
+      case: "メールの形式が不正",
+      body: { email: "not-an-email", password: "password123" },
+    },
+    {
+      case: "パスワードが空",
+      body: { email: "alice@example.com", password: "" },
+    },
+    { case: "email がない", body: { password: "password123" } },
+    { case: "password がない", body: { email: "alice@example.com" } },
+  ])("$case なら 400 と統一形式のエラーを返す", async ({ body }) => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
+
+  // パスワードの長さの規則は signup で課すもの。規則を後から厳しくしても、既存のユーザーが login できなくならないようにする
+  it("signup の規則に合わない長さのパスワードでも、400 ではなく 401 を返す", async () => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "alice@example.com", password: "short" }),
+    });
+
+    expect(res.status).toBe(401);
+  });
 });
