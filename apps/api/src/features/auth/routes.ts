@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import { setCookie } from "hono/cookie";
+import { deleteCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { requireAuth, TOKEN_COOKIE_NAME } from "../../middleware/auth.ts";
@@ -27,13 +27,18 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// HttpOnly で JS から読めなくし、Secure で HTTPS（と localhost）だけに送り、SameSite=Strict で他サイトからのリクエストに付けない
+// HttpOnly で JS から読めなくし、Secure で HTTPS（と localhost）だけに送り、SameSite=Strict で他サイトからのリクエストに付けない。
+// 削除するときも同じ Path を指定しないと、ブラウザは別の Cookie とみなして消さない
+const TOKEN_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "Strict",
+  path: "/",
+} as const;
+
 const setTokenCookie = async (c: Context, userId: string) => {
   setCookie(c, TOKEN_COOKIE_NAME, await issueToken(userId), {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Strict",
-    path: "/",
+    ...TOKEN_COOKIE_OPTIONS,
     maxAge: TOKEN_MAX_AGE,
   });
 };
@@ -56,4 +61,8 @@ export const auth = new Hono()
       throw new HTTPException(401);
     }
     return c.json(user, 200);
+  })
+  .post("/logout", (c) => {
+    deleteCookie(c, TOKEN_COOKIE_NAME, TOKEN_COOKIE_OPTIONS);
+    return c.body(null, 204);
   });

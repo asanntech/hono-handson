@@ -362,3 +362,36 @@ describe("GET /auth/me", () => {
     expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
   });
 });
+
+describe("POST /auth/logout", () => {
+  it("204 を返し、発行時と同じ属性で Max-Age=0 の Cookie を返して削除させる", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const [cookie] = parseSetCookie(signupRes);
+
+    const res = await app.request("/auth/logout", {
+      method: "POST",
+      headers: { Cookie: `token=${cookie.value}` },
+    });
+
+    expect(res.status).toBe(204);
+    // ブラウザは名前・Path が一致する Cookie を上書きする。Max-Age=0 なので即座に消える
+    expect(parseSetCookie(res)).toEqual([
+      {
+        name: "token",
+        value: "",
+        maxAge: 0,
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "Strict",
+      },
+    ]);
+  });
+});
