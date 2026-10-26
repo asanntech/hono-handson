@@ -136,3 +136,43 @@ describe("POST /auth/signup", () => {
     },
   );
 });
+
+describe("POST /auth/login", () => {
+  it("登録済みのメールと正しいパスワードなら 200 と { id, email } を返し、signup と同じ属性の Cookie で JWT を発行する", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const { id } = await signupRes.json();
+
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id, email: "alice@example.com" });
+    const cookies = parseSetCookie(res);
+    expect(cookies).toEqual([
+      {
+        name: "token",
+        value: expect.any(String),
+        maxAge: 604800,
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "Strict",
+      },
+    ]);
+    const payload = await verify(cookies[0].value, env.JWT_SECRET, "HS256");
+    expect(payload.sub).toBe(id);
+  });
+});

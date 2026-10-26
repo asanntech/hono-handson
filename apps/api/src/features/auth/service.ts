@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { sign } from "hono/jwt";
 import postgres from "postgres";
@@ -34,6 +35,14 @@ const isUniqueViolation = (error: unknown) =>
   error instanceof Error &&
   error.cause instanceof postgres.PostgresError &&
   error.cause.code === "23505";
+
+export const login = async (input: { email: string; password: string }) => {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, input.email));
+  return { id: user.id, email: user.email };
+};
 
 export const issueToken = (userId: string) =>
   sign(
