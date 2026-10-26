@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { parseEnv } from "./env.ts";
 
 // 必須の環境変数。ほかの項目を検証するテストで、入力に含めておく
-const requiredEnv = { DATABASE_URL: "postgres://user:pass@localhost:5432/app" };
+const requiredEnv = {
+  DATABASE_URL: "postgres://user:pass@localhost:5432/app",
+  JWT_SECRET: "a".repeat(32),
+};
 
 describe("parseEnv", () => {
   it("PORT が指定されると数値に変換して返す", () => {
@@ -29,7 +32,7 @@ describe("parseEnv", () => {
     "postgres://user:pass@localhost:5432/app",
     "postgresql://user:pass@localhost:5432/app",
   ])("DATABASE_URL が %j ならその値を返す", (url) => {
-    const env = parseEnv({ DATABASE_URL: url });
+    const env = parseEnv({ ...requiredEnv, DATABASE_URL: url });
 
     expect(env.DATABASE_URL).toBe(url);
   });
@@ -62,7 +65,14 @@ describe("parseEnv", () => {
   it.each([undefined, "", "not-a-url", "http://localhost:5432/app"])(
     "DATABASE_URL が %j なら検証エラーを投げる",
     (url) => {
-      expect(() => parseEnv({ DATABASE_URL: url })).toThrow();
+      expect(() => parseEnv({ ...requiredEnv, DATABASE_URL: url })).toThrow();
+    },
+  );
+
+  it.each([undefined, "a".repeat(31)])(
+    "JWT_SECRET が %j なら検証エラーを投げる",
+    (secret) => {
+      expect(() => parseEnv({ ...requiredEnv, JWT_SECRET: secret })).toThrow();
     },
   );
 });

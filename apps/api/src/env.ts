@@ -6,7 +6,7 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-  JWT_SECRET: z.string().optional(),
+  JWT_SECRET: z.string().min(32),
 });
 
 export const parseEnv = (source: Record<string, string | undefined>) =>

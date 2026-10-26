@@ -12,7 +12,11 @@ export default defineConfig({
     passWithNoTests: true,
     // vi.spyOn で差し替えた関数を、テストが失敗しても各テストの後に元に戻す
     restoreMocks: true,
-    env: { DATABASE_URL: TEST_DATABASE_URL },
+    // JWT_SECRET はテストで同じ値を使えばよいため、固定値を渡す
+    env: {
+      DATABASE_URL: TEST_DATABASE_URL,
+      JWT_SECRET: "test-jwt-secret-at-least-32-characters",
+    },
     globalSetup: ["./src/test/global-setup.ts"],
     setupFiles: ["./src/test/setup.ts"],
     // テストファイルが同じ DB を同時に TRUNCATE し合わないよう、ファイルを 1 つずつ実行する
