@@ -63,4 +63,39 @@ describe("POST /auth/signup", () => {
     expect(payload.exp).toBeGreaterThanOrEqual(before + 604800);
     expect(payload.exp).toBeLessThanOrEqual(after + 604800);
   });
+
+  it.each([
+    {
+      case: "メールの形式が不正",
+      body: { email: "not-an-email", password: "password123" },
+    },
+    {
+      case: "パスワードが 7 文字",
+      body: { email: "alice@example.com", password: "a".repeat(7) },
+    },
+    {
+      case: "パスワードが 73 バイト",
+      body: { email: "alice@example.com", password: "a".repeat(73) },
+    },
+    // 「あ」は UTF-8 で 3 バイト。25 文字でも 75 バイトになり、bcrypt が切り捨てる長さを超える
+    {
+      case: "パスワードが 25 文字だが 75 バイト",
+      body: { email: "alice@example.com", password: "あ".repeat(25) },
+    },
+    { case: "email がない", body: { password: "password123" } },
+    { case: "password がない", body: { email: "alice@example.com" } },
+  ])(
+    "$case なら 400 と統一形式のエラーを返し、ユーザーを作らない",
+    async ({ body }) => {
+      const res = await app.request("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+      expect(await db.select().from(users)).toEqual([]);
+    },
+  );
 });
