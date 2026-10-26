@@ -1,5 +1,6 @@
 import { type Context, Hono } from "hono";
 import { setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { requireAuth, TOKEN_COOKIE_NAME } from "../../middleware/auth.ts";
 import { validator } from "../../middleware/validator.ts";
@@ -50,5 +51,9 @@ export const auth = new Hono()
   })
   .get("/me", requireAuth, async (c) => {
     const user = await findUser(c.get("userId"));
+    // JWT の発行後にユーザーが削除された場合。トークンが指す本人がいないので、未認証として扱う
+    if (!user) {
+      throw new HTTPException(401);
+    }
     return c.json(user, 200);
   });

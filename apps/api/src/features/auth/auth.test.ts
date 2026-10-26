@@ -267,6 +267,28 @@ describe("GET /auth/me", () => {
     expect(await res.json()).toEqual({ id, email: "alice@example.com" });
   });
 
+  it("JWT は有効でもユーザーが存在しなければ 401 を返す", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const { id } = await signupRes.json();
+    const [cookie] = parseSetCookie(signupRes);
+    // JWT は期限まで有効なままなので、発行後にユーザーが削除されることがある
+    await db.delete(users).where(eq(users.id, id));
+
+    const res = await app.request("/auth/me", {
+      headers: { Cookie: `token=${cookie.value}` },
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+  });
+
   it("Cookie を付けないと 401 と統一形式のエラーを返す", async () => {
     const res = await app.request("/auth/me");
 
