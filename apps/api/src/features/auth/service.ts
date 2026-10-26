@@ -48,6 +48,14 @@ export const login = async (input: { email: string; password: string }) => {
   return { id: user.id, email: user.email };
 };
 
+export const findUser = async (id: string) => {
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, id));
+  return user;
+};
+
 export const issueToken = (userId: string) =>
   sign(
     { sub: userId, exp: Math.floor(Date.now() / 1000) + TOKEN_MAX_AGE },

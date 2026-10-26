@@ -245,3 +245,25 @@ describe("POST /auth/login", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("GET /auth/me", () => {
+  it("有効な Cookie を付けると 200 とログイン中のユーザー { id, email } を返す", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const { id } = await signupRes.json();
+    const [cookie] = parseSetCookie(signupRes);
+
+    const res = await app.request("/auth/me", {
+      headers: { Cookie: `token=${cookie.value}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id, email: "alice@example.com" });
+  });
+});
