@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -21,7 +22,9 @@ export default async function setup(project: TestProject) {
     await client`DROP SCHEMA IF EXISTS drizzle CASCADE`;
     await client`CREATE SCHEMA public`;
     await migrate(drizzle(client), {
-      migrationsFolder: new URL("../db/migrations", import.meta.url).pathname,
+      migrationsFolder: fileURLToPath(
+        new URL("../db/migrations", import.meta.url),
+      ),
     });
   } finally {
     await client.end();
