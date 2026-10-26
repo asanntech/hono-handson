@@ -64,6 +64,28 @@ describe("POST /auth/signup", () => {
     expect(payload.exp).toBeLessThanOrEqual(after + 604800);
   });
 
+  it("登録済みのメールなら 409 を返し、ユーザーを増やさず Cookie も発行しない", async () => {
+    const signup = () =>
+      app.request("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      });
+    await signup();
+
+    const res = await signup();
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: { message: "Email is already registered" },
+    });
+    expect(res.headers.getSetCookie()).toEqual([]);
+    expect(await db.select().from(users)).toHaveLength(1);
+  });
+
   it.each([
     { case: "ちょうど 8 文字", password: "a".repeat(8) },
     { case: "ちょうど 72 バイト", password: "a".repeat(72) },

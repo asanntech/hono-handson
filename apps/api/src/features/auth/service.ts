@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
+import { HTTPException } from "hono/http-exception";
 import { sign } from "hono/jwt";
+import postgres from "postgres";
 import { db } from "../../db/client.ts";
 import { users } from "../../db/schema.ts";
 import { env } from "../../env.ts";
@@ -12,12 +14,26 @@ export const TOKEN_MAX_AGE = 60 * 60 * 24 * 7;
 
 export const signup = async (input: { email: string; password: string }) => {
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
-  const [user] = await db
-    .insert(users)
-    .values({ email: input.email, passwordHash })
-    .returning({ id: users.id, email: users.email });
-  return user;
+  try {
+    const [user] = await db
+      .insert(users)
+      .values({ email: input.email, passwordHash })
+      .returning({ id: users.id, email: users.email });
+    return user;
+  } catch (error) {
+    // 事前に SELECT で確かめるのではなく、DB の一意制約で判定する。同時に登録されても重複を防げる
+    if (isUniqueViolation(error)) {
+      throw new HTTPException(409, { message: "Email is already registered" });
+    }
+    throw error;
+  }
 };
+
+// Drizzle は DB のエラーを cause に包んで投げる。23505 は PostgreSQL の unique_violation
+const isUniqueViolation = (error: unknown) =>
+  error instanceof Error &&
+  error.cause instanceof postgres.PostgresError &&
+  error.cause.code === "23505";
 
 export const issueToken = (userId: string) =>
   sign(
