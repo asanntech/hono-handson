@@ -14,5 +14,8 @@ export default defineConfig({
     restoreMocks: true,
     env: { DATABASE_URL: TEST_DATABASE_URL },
     globalSetup: ["./src/test/global-setup.ts"],
+    setupFiles: ["./src/test/setup.ts"],
+    // テストファイルが同じ DB を同時に TRUNCATE し合わないよう、ファイルを 1 つずつ実行する
+    fileParallelism: false,
   },
 });
