@@ -65,6 +65,21 @@ describe("POST /auth/signup", () => {
   });
 
   it.each([
+    { case: "ちょうど 8 文字", password: "a".repeat(8) },
+    { case: "ちょうど 72 バイト", password: "a".repeat(72) },
+    // 「あ」は UTF-8 で 3 バイト。24 文字で 72 バイトになる
+    { case: "24 文字でちょうど 72 バイト", password: "あ".repeat(24) },
+  ])("パスワードが $case なら 201 を返す", async ({ password }) => {
+    const res = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "alice@example.com", password }),
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it.each([
     {
       case: "メールの形式が不正",
       body: { email: "not-an-email", password: "password123" },
