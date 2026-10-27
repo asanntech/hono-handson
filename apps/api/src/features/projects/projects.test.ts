@@ -313,3 +313,27 @@ describe("GET /projects/:projectId/members", () => {
     ]);
   });
 });
+
+describe("PATCH /projects/:projectId", () => {
+  it("owner が name を送ると 200 と更新後の { id, name } を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const createRes = await app.request("/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ name: "Website Renewal" }),
+    });
+    const project = await createRes.json();
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ name: "Website Renewal 2026" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      id: project.id,
+      name: "Website Renewal 2026",
+    });
+  });
+});

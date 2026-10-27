@@ -54,3 +54,12 @@ export const listMembers = (projectId: string) =>
     .innerJoin(users, eq(users.id, projectMembers.userId))
     .where(eq(projectMembers.projectId, projectId))
     .orderBy(asc(projectMembers.createdAt));
+
+export const updateProject = async (id: string, input: { name: string }) => {
+  const [project] = await db
+    .update(projects)
+    .set({ name: input.name })
+    .where(eq(projects.id, id))
+    .returning({ id: projects.id, name: projects.name });
+  return project;
+};

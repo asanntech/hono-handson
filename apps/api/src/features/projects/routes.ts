@@ -8,6 +8,7 @@ import {
   findProject,
   listMembers,
   listProjects,
+  updateProject,
 } from "./service.ts";
 
 const projectSchema = z.object({
@@ -32,6 +33,13 @@ export const projects = new Hono()
   })
   .get("/:projectId", requireMember, async (c) => {
     const project = await findProject(c.req.param("projectId"));
+    return c.json(project, 200);
+  })
+  .patch("/:projectId", validator("json", projectSchema), async (c) => {
+    const project = await updateProject(
+      c.req.param("projectId"),
+      c.req.valid("json"),
+    );
     return c.json(project, 200);
   })
   .get("/:projectId/members", requireMember, async (c) => {
