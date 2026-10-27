@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.ts";
-import { requireMember } from "../../middleware/authorize.ts";
+import { requireMember, requireOwner } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
 import {
   createProject,
@@ -36,14 +36,20 @@ export const projects = new Hono()
     const project = await findProject(c.req.param("projectId"));
     return c.json(project, 200);
   })
-  .patch("/:projectId", validator("json", projectSchema), async (c) => {
-    const project = await updateProject(
-      c.req.param("projectId"),
-      c.req.valid("json"),
-    );
-    return c.json(project, 200);
-  })
-  .delete("/:projectId", async (c) => {
+  .patch(
+    "/:projectId",
+    requireMember,
+    requireOwner,
+    validator("json", projectSchema),
+    async (c) => {
+      const project = await updateProject(
+        c.req.param("projectId"),
+        c.req.valid("json"),
+      );
+      return c.json(project, 200);
+    },
+  )
+  .delete("/:projectId", requireMember, requireOwner, async (c) => {
     await deleteProject(c.req.param("projectId"));
     return c.body(null, 204);
   })

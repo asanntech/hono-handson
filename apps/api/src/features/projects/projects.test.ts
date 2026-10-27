@@ -332,3 +332,36 @@ describe("DELETE /projects/:projectId", () => {
     ).toEqual([]);
   });
 });
+
+describe("owner だけができる操作", () => {
+  it.each([
+    { method: "PATCH", body: { name: "Hijacked" } },
+    { method: "DELETE", body: undefined },
+  ])(
+    "member が $method /projects/:projectId を呼ぶと 403 を返し、プロジェクトを変更しない",
+    async ({ method, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      // 招待 API はまだないので、bob を member として直接登録する
+      await db
+        .insert(projectMembers)
+        .values({ projectId: project.id, userId: bob.id, role: "member" });
+
+      const res = await app.request(`/projects/${project.id}`, {
+        method,
+        headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+        body: body && JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: { message: "Forbidden" } });
+      expect(
+        await db
+          .select({ id: projects.id, name: projects.name })
+          .from(projects)
+          .where(eq(projects.id, project.id)),
+      ).toEqual([{ id: project.id, name: "Website Renewal" }]);
+    },
+  );
+});
