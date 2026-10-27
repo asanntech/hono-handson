@@ -19,7 +19,7 @@ const projectSchema = z.object({
 });
 
 const memberSchema = z.object({
-  email: z.string(),
+  email: z.email(),
 });
 
 // /projects 配下はすべてログインが必要。ルートごとに付けると、新しいルートで付け忘れるおそれがある。

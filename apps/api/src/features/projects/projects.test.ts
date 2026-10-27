@@ -511,4 +511,21 @@ describe("POST /projects/:projectId/members", () => {
       { userId: alice.id, email: "alice@example.com", role: "owner" },
     ]);
   });
+
+  it.each([
+    { case: "メールの形式でない", body: { email: "not-an-email" } },
+    { case: "未指定", body: {} },
+  ])("email が $case なら 400 を返す", async ({ body }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
 });
