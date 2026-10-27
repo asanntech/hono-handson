@@ -409,6 +409,31 @@ describe("owner だけができる操作", () => {
       { userId: bob.id, email: "bob@example.com", role: "member" },
     ]);
   });
+
+  it("member がメンバーを外そうとすると 403 を返し、メンバーを変えない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const carol = await signupAs("carol@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await addMemberAs(alice, project, "bob@example.com");
+    await addMemberAs(alice, project, "carol@example.com");
+
+    const res = await app.request(
+      `/projects/${project.id}/members/${carol.id}`,
+      { method: "DELETE", headers: { Cookie: bob.cookie } },
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: { message: "Forbidden" } });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+      { userId: bob.id, email: "bob@example.com", role: "member" },
+      { userId: carol.id, email: "carol@example.com", role: "member" },
+    ]);
+  });
 });
 
 describe("メンバーでないユーザー", () => {
@@ -474,6 +499,29 @@ describe("メンバーでないユーザー", () => {
     });
     expect(await membersRes.json()).toEqual([
       { userId: alice.id, email: "alice@example.com", role: "owner" },
+    ]);
+  });
+
+  it("メンバーを外そうとすると 404 を返し、メンバーを変えない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const dave = await signupAs("dave@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await addMemberAs(alice, project, "bob@example.com");
+
+    const res = await app.request(`/projects/${project.id}/members/${bob.id}`, {
+      method: "DELETE",
+      headers: { Cookie: dave.cookie },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+      { userId: bob.id, email: "bob@example.com", role: "member" },
     ]);
   });
 });

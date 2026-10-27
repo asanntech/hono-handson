@@ -74,7 +74,7 @@ export const projects = new Hono()
       return c.json(member, 201);
     },
   )
-  .delete("/:projectId/members/:userId", async (c) => {
+  .delete("/:projectId/members/:userId", requireOwner, async (c) => {
     await removeMember(c.req.param("projectId"), c.req.param("userId"));
     return c.body(null, 204);
   });
