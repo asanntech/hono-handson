@@ -302,6 +302,26 @@ describe("PATCH /projects/:projectId", () => {
       name: "Website Renewal 2026",
     });
   });
+
+  it("owner でも name が不正なら 400 を返し、name を変えない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ name: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+    expect(
+      await db
+        .select({ name: projects.name })
+        .from(projects)
+        .where(eq(projects.id, project.id)),
+    ).toEqual([{ name: "Website Renewal" }]);
+  });
 });
 
 describe("DELETE /projects/:projectId", () => {
