@@ -490,4 +490,25 @@ describe("POST /projects/:projectId/members", () => {
       ]);
     },
   );
+
+  it("未登録のメールを招待すると 404 を返し、メンバーを変えない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ email: "nobody@example.com" }),
+    });
+
+    // 招待できるのはプロジェクトの存在を知っている owner なので、見つからないのがユーザーだと伝える
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: { message: "User not found" } });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+    ]);
+  });
 });

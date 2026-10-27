@@ -75,6 +75,9 @@ export const addMember = async (projectId: string, email: string) => {
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.email, email));
+  if (!user) {
+    throw new HTTPException(404, { message: "User not found" });
+  }
   try {
     const [member] = await db
       .insert(projectMembers)
