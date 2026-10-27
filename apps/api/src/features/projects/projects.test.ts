@@ -216,4 +216,40 @@ describe("GET /projects", () => {
       ]),
     );
   });
+
+  it("メンバーになっているプロジェクトが 1 件もなければ、他人のプロジェクトがあっても空の配列を返す", async () => {
+    const aliceSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const [aliceCookie] = parseSetCookie(aliceSignupRes);
+    const bobSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "bob@example.com",
+        password: "password123",
+      }),
+    });
+    const [bobCookie] = parseSetCookie(bobSignupRes);
+    await app.request("/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `token=${bobCookie.value}`,
+      },
+      body: JSON.stringify({ name: "Bob Project" }),
+    });
+
+    const res = await app.request("/projects", {
+      headers: { Cookie: `token=${aliceCookie.value}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
 });
