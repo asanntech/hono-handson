@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { db } from "../../db/client.ts";
-import { isUniqueViolation } from "../../db/errors.ts";
+import { isForeignKeyViolation, isUniqueViolation } from "../../db/errors.ts";
 import { projectMembers, projects, users } from "../../db/schema.ts";
 
 export const createProject = (input: { name: string; userId: string }) =>
@@ -29,6 +29,10 @@ export const findProject = async (id: string) => {
     .select({ id: projects.id, name: projects.name })
     .from(projects)
     .where(eq(projects.id, id));
+  // 認可を通った後、ここまでの間に owner がプロジェクトを削除していることがある
+  if (!project) {
+    throw new HTTPException(404);
+  }
   return project;
 };
 
@@ -63,6 +67,10 @@ export const updateProject = async (id: string, input: { name: string }) => {
     .set({ name: input.name })
     .where(eq(projects.id, id))
     .returning({ id: projects.id, name: projects.name });
+  // 認可を通った後、ここまでの間に owner がプロジェクトを削除していることがある
+  if (!project) {
+    throw new HTTPException(404);
+  }
   return project;
 };
 
@@ -88,6 +96,10 @@ export const addMember = async (projectId: string, email: string) => {
     // signup と同じく、事前に SELECT で確かめるのではなく主キーの一意制約で判定する。同時に招待されても重複を防げる
     if (isUniqueViolation(error)) {
       throw new HTTPException(409, { message: "User is already a member" });
+    }
+    // 認可を通った後、INSERT までの間に owner がプロジェクトを削除していると、外部キー違反になる
+    if (isForeignKeyViolation(error)) {
+      throw new HTTPException(404);
     }
     throw error;
   }
