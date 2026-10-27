@@ -29,13 +29,16 @@ export const requireMember = createMiddleware<{ Variables: MemberVariables }>(
   },
 );
 
-// requireMember の後に置き、owner でなければ 403 にする。
-// メンバーにはプロジェクトの存在が見えているので、隠さずに権限がないことを伝える
+// requireAuth の後に置き、パスの :projectId の owner でなければ弾く。
+// 中で requireMember を呼ぶので、メンバーでなければ requireMember と同じ 404 になる。
+// メンバーにはプロジェクトの存在が見えているので、owner でないメンバーには隠さずに 403 で権限がないことを伝える
 export const requireOwner = createMiddleware<{ Variables: MemberVariables }>(
   async (c, next) => {
-    if (c.get("role") !== "owner") {
-      throw new HTTPException(403);
-    }
-    await next();
+    await requireMember(c, async () => {
+      if (c.get("role") !== "owner") {
+        throw new HTTPException(403);
+      }
+      await next();
+    });
   },
 );

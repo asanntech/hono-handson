@@ -43,7 +43,6 @@ export const projects = new Hono()
   })
   .patch(
     "/:projectId",
-    requireMember,
     requireOwner,
     validator("json", projectSchema),
     async (c) => {
@@ -54,7 +53,7 @@ export const projects = new Hono()
       return c.json(project, 200);
     },
   )
-  .delete("/:projectId", requireMember, requireOwner, async (c) => {
+  .delete("/:projectId", requireOwner, async (c) => {
     await deleteProject(c.req.param("projectId"));
     return c.body(null, 204);
   })
@@ -64,7 +63,6 @@ export const projects = new Hono()
   })
   .post(
     "/:projectId/members",
-    requireMember,
     requireOwner,
     validator("json", memberSchema),
     async (c) => {
