@@ -67,3 +67,15 @@ export const updateProject = async (id: string, input: { name: string }) => {
 export const deleteProject = async (id: string) => {
   await db.delete(projects).where(eq(projects.id, id));
 };
+
+export const addMember = async (projectId: string, email: string) => {
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.email, email));
+  const [member] = await db
+    .insert(projectMembers)
+    .values({ projectId, userId: user.id, role: "member" })
+    .returning({ userId: projectMembers.userId, role: projectMembers.role });
+  return { userId: member.userId, email: user.email, role: member.role };
+};

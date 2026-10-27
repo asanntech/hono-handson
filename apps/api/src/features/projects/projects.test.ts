@@ -431,3 +431,31 @@ describe("メンバーでないユーザー", () => {
     expect(await res.json()).toEqual({ error: { message: "Not Found" } });
   });
 });
+
+describe("POST /projects/:projectId/members", () => {
+  it('owner が登録済みユーザーのメールを送ると 201 と { userId, email, role: "member" } を返し、メンバー一覧に加わる', async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ email: "bob@example.com" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      userId: bob.id,
+      email: "bob@example.com",
+      role: "member",
+    });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: bob.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+      { userId: bob.id, email: "bob@example.com", role: "member" },
+    ]);
+  });
+});

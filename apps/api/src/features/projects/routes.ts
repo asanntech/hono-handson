@@ -4,6 +4,7 @@ import { requireAuth } from "../../middleware/auth.ts";
 import { requireMember, requireOwner } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
 import {
+  addMember,
   createProject,
   deleteProject,
   findProject,
@@ -15,6 +16,10 @@ import {
 const projectSchema = z.object({
   // trim を先に置くと、空白を落とした後の文字数で min / max を判定する。空白だけの name は空文字になり弾かれる
   name: z.string().trim().min(1).max(100),
+});
+
+const memberSchema = z.object({
+  email: z.string(),
 });
 
 // /projects 配下はすべてログインが必要。ルートごとに付けると、新しいルートで付け忘れるおそれがある。
@@ -56,4 +61,11 @@ export const projects = new Hono()
   .get("/:projectId/members", requireMember, async (c) => {
     const members = await listMembers(c.req.param("projectId"));
     return c.json(members, 200);
+  })
+  .post("/:projectId/members", validator("json", memberSchema), async (c) => {
+    const member = await addMember(
+      c.req.param("projectId"),
+      c.req.valid("json").email,
+    );
+    return c.json(member, 201);
   });
