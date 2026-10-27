@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.ts";
+import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
 import { createProject, findProject, listProjects } from "./service.ts";
 
@@ -24,7 +25,7 @@ export const projects = new Hono()
     const myProjects = await listProjects(c.get("userId"));
     return c.json(myProjects, 200);
   })
-  .get("/:projectId", async (c) => {
+  .get("/:projectId", requireMember, async (c) => {
     const project = await findProject(c.req.param("projectId"));
     return c.json(project, 200);
   });

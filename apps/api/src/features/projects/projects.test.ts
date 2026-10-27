@@ -5,6 +5,18 @@ import { app } from "../../app.ts";
 import { db } from "../../db/client.ts";
 import { projectMembers, projects } from "../../db/schema.ts";
 
+// ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
+const signupAs = async (email: string) => {
+  const res = await app.request("/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "password123" }),
+  });
+  const { id } = await res.json();
+  const [cookie] = parseSetCookie(res);
+  return { id: id as string, cookie: `token=${cookie.value}` };
+};
+
 describe("/projects 配下の認証", () => {
   // 存在しない ID でよい。認証はプロジェクトを探すより前に行うため
   const projectId = "00000000-0000-4000-8000-000000000000";
@@ -32,22 +44,13 @@ describe("/projects 配下の認証", () => {
 
 describe("POST /projects", () => {
   it("ログイン中のユーザーが name を送ると 201 と { id, name } を返し、作成者を owner として登録する", async () => {
-    const signupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const alice = await signupRes.json();
-    const [cookie] = parseSetCookie(signupRes);
+    const alice = await signupAs("alice@example.com");
 
     const res = await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${cookie.value}`,
+        Cookie: alice.cookie,
       },
       body: JSON.stringify({ name: "Website Renewal" }),
     });
@@ -64,21 +67,13 @@ describe("POST /projects", () => {
   });
 
   it("name が 100 文字なら受け付けて 201 を返す", async () => {
-    const signupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const [cookie] = parseSetCookie(signupRes);
+    const alice = await signupAs("alice@example.com");
 
     const res = await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${cookie.value}`,
+        Cookie: alice.cookie,
       },
       body: JSON.stringify({ name: "a".repeat(100) }),
     });
@@ -91,21 +86,13 @@ describe("POST /projects", () => {
   });
 
   it("name の前後に空白があれば、落としてから保存して返す", async () => {
-    const signupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const [cookie] = parseSetCookie(signupRes);
+    const alice = await signupAs("alice@example.com");
 
     const res = await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${cookie.value}`,
+        Cookie: alice.cookie,
       },
       body: JSON.stringify({ name: "  Website Renewal  " }),
     });
@@ -126,21 +113,13 @@ describe("POST /projects", () => {
   ])(
     "name が $case なら 400 を返し、プロジェクトを作らない",
     async ({ body }) => {
-      const signupRes = await app.request("/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: "alice@example.com",
-          password: "password123",
-        }),
-      });
-      const [cookie] = parseSetCookie(signupRes);
+      const alice = await signupAs("alice@example.com");
 
       const res = await app.request("/projects", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Cookie: `token=${cookie.value}`,
+          Cookie: alice.cookie,
         },
         body: JSON.stringify(body),
       });
@@ -154,46 +133,23 @@ describe("POST /projects", () => {
 
 describe("GET /projects", () => {
   it("自分がメンバーになっているプロジェクトだけを、owner か member かに関わらず返す", async () => {
-    const aliceSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const alice = await aliceSignupRes.json();
-    const [aliceCookie] = parseSetCookie(aliceSignupRes);
-    const bobSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "bob@example.com",
-        password: "password123",
-      }),
-    });
-    const [bobCookie] = parseSetCookie(bobSignupRes);
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
 
     const createProject = async (cookie: string, name: string) => {
       const res = await app.request("/projects", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Cookie: `token=${cookie}`,
+          Cookie: cookie,
         },
         body: JSON.stringify({ name }),
       });
       return res.json();
     };
-    const aliceProject = await createProject(
-      aliceCookie.value,
-      "Alice Project",
-    );
-    const sharedProject = await createProject(
-      bobCookie.value,
-      "Shared Project",
-    );
-    await createProject(bobCookie.value, "Bob Project");
+    const aliceProject = await createProject(alice.cookie, "Alice Project");
+    const sharedProject = await createProject(bob.cookie, "Shared Project");
+    await createProject(bob.cookie, "Bob Project");
     // 招待 API はまだないので、alice を bob のプロジェクトの member として直接登録する
     await db.insert(projectMembers).values({
       projectId: sharedProject.id,
@@ -202,7 +158,7 @@ describe("GET /projects", () => {
     });
 
     const res = await app.request("/projects", {
-      headers: { Cookie: `token=${aliceCookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
 
     expect(res.status).toBe(200);
@@ -218,35 +174,19 @@ describe("GET /projects", () => {
   });
 
   it("メンバーになっているプロジェクトが 1 件もなければ、他人のプロジェクトがあっても空の配列を返す", async () => {
-    const aliceSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const [aliceCookie] = parseSetCookie(aliceSignupRes);
-    const bobSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "bob@example.com",
-        password: "password123",
-      }),
-    });
-    const [bobCookie] = parseSetCookie(bobSignupRes);
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
     await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${bobCookie.value}`,
+        Cookie: bob.cookie,
       },
       body: JSON.stringify({ name: "Bob Project" }),
     });
 
     const res = await app.request("/projects", {
-      headers: { Cookie: `token=${aliceCookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
 
     expect(res.status).toBe(200);
@@ -256,30 +196,13 @@ describe("GET /projects", () => {
 
 describe("GET /projects/:projectId", () => {
   it("owner も member も 200 と { id, name } を受け取る", async () => {
-    const aliceSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const [aliceCookie] = parseSetCookie(aliceSignupRes);
-    const bobSignupRes = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "bob@example.com",
-        password: "password123",
-      }),
-    });
-    const bob = await bobSignupRes.json();
-    const [bobCookie] = parseSetCookie(bobSignupRes);
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
     const createRes = await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${aliceCookie.value}`,
+        Cookie: alice.cookie,
       },
       body: JSON.stringify({ name: "Website Renewal" }),
     });
@@ -290,10 +213,10 @@ describe("GET /projects/:projectId", () => {
       .values({ projectId: project.id, userId: bob.id, role: "member" });
 
     const ownerRes = await app.request(`/projects/${project.id}`, {
-      headers: { Cookie: `token=${aliceCookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
     const memberRes = await app.request(`/projects/${project.id}`, {
-      headers: { Cookie: `token=${bobCookie.value}` },
+      headers: { Cookie: bob.cookie },
     });
 
     expect(ownerRes.status).toBe(200);
@@ -305,6 +228,38 @@ describe("GET /projects/:projectId", () => {
     expect(await memberRes.json()).toEqual({
       id: project.id,
       name: "Website Renewal",
+    });
+  });
+
+  it("メンバーでなければ、存在しない ID を指定したときと同じ 404 を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const carol = await signupAs("carol@example.com");
+    const createRes = await app.request("/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: alice.cookie,
+      },
+      body: JSON.stringify({ name: "Website Renewal" }),
+    });
+    const project = await createRes.json();
+
+    const nonMemberRes = await app.request(`/projects/${project.id}`, {
+      headers: { Cookie: carol.cookie },
+    });
+    const missingRes = await app.request(
+      "/projects/00000000-0000-4000-8000-000000000000",
+      { headers: { Cookie: carol.cookie } },
+    );
+
+    // ステータスも本文も同じにし、プロジェクトが存在するかどうかを区別させない
+    expect(nonMemberRes.status).toBe(404);
+    expect(await nonMemberRes.json()).toEqual({
+      error: { message: "Not Found" },
+    });
+    expect(missingRes.status).toBe(404);
+    expect(await missingRes.json()).toEqual({
+      error: { message: "Not Found" },
     });
   });
 });

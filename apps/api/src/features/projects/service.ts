@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../db/client.ts";
 import { projectMembers, projects } from "../../db/schema.ts";
 
@@ -28,4 +28,17 @@ export const findProject = async (id: string) => {
     .from(projects)
     .where(eq(projects.id, id));
   return project;
+};
+
+export const findMemberRole = async (projectId: string, userId: string) => {
+  const [member] = await db
+    .select({ role: projectMembers.role })
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, projectId),
+        eq(projectMembers.userId, userId),
+      ),
+    );
+  return member?.role;
 };
