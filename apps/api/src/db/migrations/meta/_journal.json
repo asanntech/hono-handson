@@ -22,6 +22,13 @@
       "when": 1793003850687,
       "tag": "0002_add_users_password_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793064488157,
+      "tag": "0003_create_projects",
+      "breakpoints": true
     }
   ]
 }
