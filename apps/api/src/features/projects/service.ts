@@ -113,4 +113,5 @@ export const removeMember = async (projectId: string, userId: string) => {
   if ((await findMemberRole(projectId, userId)) === "owner") {
     throw new HTTPException(409, { message: "Owner cannot be removed" });
   }
+  throw new HTTPException(404, { message: "Member not found" });
 };

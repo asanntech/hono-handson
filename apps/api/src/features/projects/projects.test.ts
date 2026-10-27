@@ -670,4 +670,37 @@ describe("DELETE /projects/:projectId/members/:userId", () => {
       { userId: alice.id, email: "alice@example.com", role: "owner" },
     ]);
   });
+
+  it.each([
+    { case: "メンバーでないユーザー", target: "carol" },
+    {
+      case: "存在しないユーザー",
+      target: "00000000-0000-4000-8000-000000000000",
+    },
+    { case: "UUID の形でない値", target: "not-a-uuid" },
+  ])(
+    "外す対象が $case なら 404 を返し、メンバーを変えない",
+    async ({ target }) => {
+      const alice = await signupAs("alice@example.com");
+      const carol = await signupAs("carol@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const userId = target === "carol" ? carol.id : target;
+
+      const res = await app.request(
+        `/projects/${project.id}/members/${userId}`,
+        { method: "DELETE", headers: { Cookie: alice.cookie } },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        error: { message: "Member not found" },
+      });
+      const membersRes = await app.request(`/projects/${project.id}/members`, {
+        headers: { Cookie: alice.cookie },
+      });
+      expect(await membersRes.json()).toEqual([
+        { userId: alice.id, email: "alice@example.com", role: "owner" },
+      ]);
+    },
+  );
 });

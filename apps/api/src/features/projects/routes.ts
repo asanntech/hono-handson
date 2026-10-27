@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.ts";
 import { requireMember, requireOwner } from "../../middleware/authorize.ts";
@@ -75,6 +76,12 @@ export const projects = new Hono()
     },
   )
   .delete("/:projectId/members/:userId", requireOwner, async (c) => {
-    await removeMember(c.req.param("projectId"), c.req.param("userId"));
+    // users.id は uuid 型。UUID でない値のまま問い合わせると、DB の型エラーで 500 になる。
+    // UUID の形でない ID が指すメンバーはいないので、400 ではなく見つからないとして扱う
+    const userId = z.uuid().safeParse(c.req.param("userId"));
+    if (!userId.success) {
+      throw new HTTPException(404, { message: "Member not found" });
+    }
+    await removeMember(c.req.param("projectId"), userId.data);
     return c.body(null, 204);
   });
