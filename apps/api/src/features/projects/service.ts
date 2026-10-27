@@ -1,5 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 import { db } from "../../db/client.ts";
+import { isUniqueViolation } from "../../db/errors.ts";
 import { projectMembers, projects, users } from "../../db/schema.ts";
 
 export const createProject = (input: { name: string; userId: string }) =>
@@ -73,9 +75,17 @@ export const addMember = async (projectId: string, email: string) => {
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.email, email));
-  const [member] = await db
-    .insert(projectMembers)
-    .values({ projectId, userId: user.id, role: "member" })
-    .returning({ userId: projectMembers.userId, role: projectMembers.role });
-  return { userId: member.userId, email: user.email, role: member.role };
+  try {
+    const [member] = await db
+      .insert(projectMembers)
+      .values({ projectId, userId: user.id, role: "member" })
+      .returning({ userId: projectMembers.userId, role: projectMembers.role });
+    return { userId: member.userId, email: user.email, role: member.role };
+  } catch (error) {
+    // signup と同じく、事前に SELECT で確かめるのではなく主キーの一意制約で判定する。同時に招待されても重複を防げる
+    if (isUniqueViolation(error)) {
+      throw new HTTPException(409, { message: "User is already a member" });
+    }
+    throw error;
+  }
 };

@@ -459,4 +459,35 @@ describe("POST /projects/:projectId/members", () => {
       { userId: bob.id, email: "bob@example.com", role: "member" },
     ]);
   });
+
+  it.each([
+    { case: "member の bob", email: "bob@example.com" },
+    { case: "owner の alice 自身", email: "alice@example.com" },
+  ])(
+    "すでにメンバーの $case を招待すると 409 を返し、メンバーを変えない",
+    async ({ email }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      await addMemberAs(alice, project, "bob@example.com");
+
+      const res = await app.request(`/projects/${project.id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ email }),
+      });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: { message: "User is already a member" },
+      });
+      const membersRes = await app.request(`/projects/${project.id}/members`, {
+        headers: { Cookie: alice.cookie },
+      });
+      expect(await membersRes.json()).toEqual([
+        { userId: alice.id, email: "alice@example.com", role: "owner" },
+        { userId: bob.id, email: "bob@example.com", role: "member" },
+      ]);
+    },
+  );
 });
