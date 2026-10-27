@@ -1,0 +1,68 @@
+import { type Context, Hono } from "hono";
+import { deleteCookie, setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
+import { requireAuth, TOKEN_COOKIE_NAME } from "../../middleware/auth.ts";
+import { validator } from "../../middleware/validator.ts";
+import {
+  findUser,
+  issueToken,
+  login,
+  signup,
+  TOKEN_MAX_AGE,
+} from "./service.ts";
+
+const credentialsSchema = z.object({
+  email: z.email(),
+  password: z
+    .string()
+    .min(8)
+    // bcrypt は 72 バイトを超える部分を無視するため、文字数ではなくバイト数で上限を設ける
+    .refine((password) => Buffer.byteLength(password) <= 72),
+});
+
+// login ではパスワードの長さの規則を課さない。規則を後から変えても、既存のユーザーが login できるようにする
+const loginSchema = z.object({
+  email: z.email(),
+  password: z.string().min(1),
+});
+
+// HttpOnly で JS から読めなくし、Secure で HTTPS（と localhost）だけに送り、SameSite=Strict で他サイトからのリクエストに付けない。
+// 削除するときも同じ Path を指定しないと、ブラウザは別の Cookie とみなして消さない
+const TOKEN_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "Strict",
+  path: "/",
+} as const;
+
+const setTokenCookie = async (c: Context, userId: string) => {
+  setCookie(c, TOKEN_COOKIE_NAME, await issueToken(userId), {
+    ...TOKEN_COOKIE_OPTIONS,
+    maxAge: TOKEN_MAX_AGE,
+  });
+};
+
+export const auth = new Hono()
+  .post("/signup", validator("json", credentialsSchema), async (c) => {
+    const user = await signup(c.req.valid("json"));
+    await setTokenCookie(c, user.id);
+    return c.json(user, 201);
+  })
+  .post("/login", validator("json", loginSchema), async (c) => {
+    const user = await login(c.req.valid("json"));
+    await setTokenCookie(c, user.id);
+    return c.json(user, 200);
+  })
+  .get("/me", requireAuth, async (c) => {
+    const user = await findUser(c.get("userId"));
+    // JWT の発行後にユーザーが削除された場合。トークンが指す本人がいないので、未認証として扱う
+    if (!user) {
+      throw new HTTPException(401);
+    }
+    return c.json(user, 200);
+  })
+  .post("/logout", (c) => {
+    deleteCookie(c, TOKEN_COOKIE_NAME, TOKEN_COOKIE_OPTIONS);
+    return c.body(null, 204);
+  });

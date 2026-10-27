@@ -7,7 +7,7 @@ describe("users テーブル", () => {
   it("ユーザーを保存すると id（UUID）と createdAt が採番されて読み出せる", async () => {
     const [created] = await db
       .insert(users)
-      .values({ email: "alice@example.com" })
+      .values({ email: "alice@example.com", passwordHash: "hashed" })
       .returning();
 
     const rows = await db.select().from(users).where(eq(users.id, created.id));
@@ -18,16 +18,21 @@ describe("users テーブル", () => {
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         ),
         email: "alice@example.com",
+        passwordHash: "hashed",
         createdAt: expect.any(Date),
       },
     ]);
   });
 
   it("同じメールアドレスのユーザーを 2 人保存しようとすると一意制約違反で失敗する", async () => {
-    await db.insert(users).values({ email: "alice@example.com" });
+    await db
+      .insert(users)
+      .values({ email: "alice@example.com", passwordHash: "hashed" });
 
     await expect(
-      db.insert(users).values({ email: "alice@example.com" }),
+      db
+        .insert(users)
+        .values({ email: "alice@example.com", passwordHash: "hashed" }),
     ).rejects.toMatchObject({ cause: { code: "23505" } });
   });
 });
