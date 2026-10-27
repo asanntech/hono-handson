@@ -262,4 +262,15 @@ describe("GET /projects/:projectId", () => {
       error: { message: "Not Found" },
     });
   });
+
+  it("projectId が UUID の形でなければ、500 ではなく 404 を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+
+    const res = await app.request("/projects/not-a-uuid", {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+  });
 });
