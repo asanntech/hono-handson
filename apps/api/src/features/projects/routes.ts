@@ -3,7 +3,12 @@ import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.ts";
 import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createProject, findProject, listProjects } from "./service.ts";
+import {
+  createProject,
+  findProject,
+  listMembers,
+  listProjects,
+} from "./service.ts";
 
 const projectSchema = z.object({
   // trim を先に置くと、空白を落とした後の文字数で min / max を判定する。空白だけの name は空文字になり弾かれる
@@ -28,4 +33,8 @@ export const projects = new Hono()
   .get("/:projectId", requireMember, async (c) => {
     const project = await findProject(c.req.param("projectId"));
     return c.json(project, 200);
+  })
+  .get("/:projectId/members", requireMember, async (c) => {
+    const members = await listMembers(c.req.param("projectId"));
+    return c.json(members, 200);
   });

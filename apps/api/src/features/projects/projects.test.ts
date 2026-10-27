@@ -274,3 +274,42 @@ describe("GET /projects/:projectId", () => {
     expect(await res.json()).toEqual({ error: { message: "Not Found" } });
   });
 });
+
+describe("GET /projects/:projectId/members", () => {
+  it("member が呼ぶと 200 と [{ userId, email, role }] を、メンバーに加わった順に返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const carol = await signupAs("carol@example.com");
+    const createRes = await app.request("/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ name: "Website Renewal" }),
+    });
+    const project = await createRes.json();
+    // 招待 API はまだないので直接登録する。INSERT の順と加わった日時の順をわざと逆にし、
+    // INSERT した順ではなく createdAt の順に並べていることを確かめる
+    await db.insert(projectMembers).values({
+      projectId: project.id,
+      userId: bob.id,
+      role: "member",
+      createdAt: new Date("2030-01-02T00:00:00Z"),
+    });
+    await db.insert(projectMembers).values({
+      projectId: project.id,
+      userId: carol.id,
+      role: "member",
+      createdAt: new Date("2030-01-01T00:00:00Z"),
+    });
+
+    const res = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: bob.cookie },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+      { userId: carol.id, email: "carol@example.com", role: "member" },
+      { userId: bob.id, email: "bob@example.com", role: "member" },
+    ]);
+  });
+});

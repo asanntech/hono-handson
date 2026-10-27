@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../../db/client.ts";
-import { projectMembers, projects } from "../../db/schema.ts";
+import { projectMembers, projects, users } from "../../db/schema.ts";
 
 export const createProject = (input: { name: string; userId: string }) =>
   // プロジェクトだけ作られて owner がいない状態を残さないよう、2 つの INSERT を 1 つのトランザクションにまとめる
@@ -42,3 +42,15 @@ export const findMemberRole = async (projectId: string, userId: string) => {
     );
   return member?.role;
 };
+
+export const listMembers = (projectId: string) =>
+  db
+    .select({
+      userId: projectMembers.userId,
+      email: users.email,
+      role: projectMembers.role,
+    })
+    .from(projectMembers)
+    .innerJoin(users, eq(users.id, projectMembers.userId))
+    .where(eq(projectMembers.projectId, projectId))
+    .orderBy(asc(projectMembers.createdAt));
