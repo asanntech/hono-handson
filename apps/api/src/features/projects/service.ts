@@ -94,12 +94,23 @@ export const addMember = async (projectId: string, email: string) => {
 };
 
 export const removeMember = async (projectId: string, userId: string) => {
-  await db
+  // owner がいなくなると、プロジェクトの更新・削除・招待を誰もできなくなる。
+  // 消せるのは member だけ、という条件を DELETE に含める。DB が 1 つの SQL の中で判定するので、同時に role が変わっても owner は消えない
+  const removed = await db
     .delete(projectMembers)
     .where(
       and(
         eq(projectMembers.projectId, projectId),
         eq(projectMembers.userId, userId),
+        eq(projectMembers.role, "member"),
       ),
-    );
+    )
+    .returning({ userId: projectMembers.userId });
+  if (removed.length > 0) {
+    return;
+  }
+  // 消えなかった理由は、DELETE の結果だけでは分からない。失敗したときだけ、改めて role を調べる
+  if ((await findMemberRole(projectId, userId)) === "owner") {
+    throw new HTTPException(409, { message: "Owner cannot be removed" });
+  }
 };

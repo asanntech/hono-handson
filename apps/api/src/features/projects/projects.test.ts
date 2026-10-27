@@ -600,4 +600,26 @@ describe("DELETE /projects/:projectId/members/:userId", () => {
     });
     expect(bobRes.status).toBe(404);
   });
+
+  it("owner を外そうとすると 409 を返し、owner はメンバーに残る", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(
+      `/projects/${project.id}/members/${alice.id}`,
+      { method: "DELETE", headers: { Cookie: alice.cookie } },
+    );
+
+    // owner がいなくなると、プロジェクトの更新・削除・招待を誰もできなくなる
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: { message: "Owner cannot be removed" },
+    });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+    ]);
+  });
 });
