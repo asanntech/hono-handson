@@ -5,6 +5,7 @@ import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
 import {
   createProject,
+  deleteProject,
   findProject,
   listMembers,
   listProjects,
@@ -41,6 +42,10 @@ export const projects = new Hono()
       c.req.valid("json"),
     );
     return c.json(project, 200);
+  })
+  .delete("/:projectId", async (c) => {
+    await deleteProject(c.req.param("projectId"));
+    return c.body(null, 204);
   })
   .get("/:projectId/members", requireMember, async (c) => {
     const members = await listMembers(c.req.param("projectId"));

@@ -63,3 +63,7 @@ export const updateProject = async (id: string, input: { name: string }) => {
     .returning({ id: projects.id, name: projects.name });
   return project;
 };
+
+export const deleteProject = async (id: string) => {
+  await db.delete(projects).where(eq(projects.id, id));
+};

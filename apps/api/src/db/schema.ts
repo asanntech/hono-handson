@@ -30,9 +30,10 @@ export const projectRole = pgEnum("project_role", ["owner", "member"]);
 export const projectMembers = pgTable(
   "project_members",
   {
+    // プロジェクトを消したら、そのメンバー情報も DB が一緒に消す
     projectId: uuid("project_id")
       .notNull()
-      .references(() => projects.id),
+      .references(() => projects.id, { onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),

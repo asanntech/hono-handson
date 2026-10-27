@@ -303,3 +303,32 @@ describe("PATCH /projects/:projectId", () => {
     });
   });
 });
+
+describe("DELETE /projects/:projectId", () => {
+  it("owner が呼ぶと 204 を返し、プロジェクトとそのメンバー情報を消す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    // 招待 API はまだないので、bob を member として直接登録する
+    await db
+      .insert(projectMembers)
+      .values({ projectId: project.id, userId: bob.id, role: "member" });
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "DELETE",
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(204);
+    expect(await res.text()).toBe("");
+    expect(
+      await db.select().from(projects).where(eq(projects.id, project.id)),
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(projectMembers)
+        .where(eq(projectMembers.projectId, project.id)),
+    ).toEqual([]);
+  });
+});

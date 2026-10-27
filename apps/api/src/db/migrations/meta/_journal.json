@@ -29,6 +29,13 @@
       "when": 1793064488157,
       "tag": "0003_create_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793081400692,
+      "tag": "0004_cascade_project_members_on_project_delete",
+      "breakpoints": true
     }
   ]
 }
