@@ -62,10 +62,16 @@ export const projects = new Hono()
     const members = await listMembers(c.req.param("projectId"));
     return c.json(members, 200);
   })
-  .post("/:projectId/members", validator("json", memberSchema), async (c) => {
-    const member = await addMember(
-      c.req.param("projectId"),
-      c.req.valid("json").email,
-    );
-    return c.json(member, 201);
-  });
+  .post(
+    "/:projectId/members",
+    requireMember,
+    requireOwner,
+    validator("json", memberSchema),
+    async (c) => {
+      const member = await addMember(
+        c.req.param("projectId"),
+        c.req.valid("json").email,
+      );
+      return c.json(member, 201);
+    },
+  );

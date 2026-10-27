@@ -385,6 +385,30 @@ describe("owner だけができる操作", () => {
       ).toEqual([{ id: project.id, name: "Website Renewal" }]);
     },
   );
+
+  it("member が招待すると 403 を返し、メンバーを変えない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    await signupAs("carol@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await addMemberAs(alice, project, "bob@example.com");
+
+    const res = await app.request(`/projects/${project.id}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+      body: JSON.stringify({ email: "carol@example.com" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: { message: "Forbidden" } });
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+      { userId: bob.id, email: "bob@example.com", role: "member" },
+    ]);
+  });
 });
 
 describe("メンバーでないユーザー", () => {
