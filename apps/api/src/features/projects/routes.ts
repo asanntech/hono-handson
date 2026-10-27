@@ -5,7 +5,7 @@ import { validator } from "../../middleware/validator.ts";
 import { createProject } from "./service.ts";
 
 const projectSchema = z.object({
-  name: z.string(),
+  name: z.string().min(1).max(100),
 });
 
 // /projects 配下はすべてログインが必要。ルートごとに付けると、新しいルートで付け忘れるおそれがある。

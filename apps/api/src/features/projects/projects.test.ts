@@ -3,7 +3,7 @@ import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it } from "vitest";
 import { app } from "../../app.ts";
 import { db } from "../../db/client.ts";
-import { projectMembers } from "../../db/schema.ts";
+import { projectMembers, projects } from "../../db/schema.ts";
 
 describe("/projects 配下の認証", () => {
   // 存在しない ID でよい。認証はプロジェクトを探すより前に行うため
@@ -62,4 +62,63 @@ describe("POST /projects", () => {
       .where(eq(projectMembers.projectId, body.id));
     expect(members).toEqual([{ userId: alice.id, role: "owner" }]);
   });
+
+  it("name が 100 文字なら受け付けて 201 を返す", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const [cookie] = parseSetCookie(signupRes);
+
+    const res = await app.request("/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `token=${cookie.value}`,
+      },
+      body: JSON.stringify({ name: "a".repeat(100) }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      name: "a".repeat(100),
+    });
+  });
+
+  it.each([
+    { case: "101 文字", body: { name: "a".repeat(101) } },
+    { case: "空文字", body: { name: "" } },
+    { case: "未指定", body: {} },
+  ])(
+    "name が $case なら 400 を返し、プロジェクトを作らない",
+    async ({ body }) => {
+      const signupRes = await app.request("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      });
+      const [cookie] = parseSetCookie(signupRes);
+
+      const res = await app.request("/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `token=${cookie.value}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+      expect(await db.select().from(projects)).toEqual([]);
+    },
+  );
 });
