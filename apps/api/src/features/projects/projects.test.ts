@@ -27,6 +27,21 @@ const createProjectAs = async (user: { cookie: string }, name: string) => {
   return (await res.json()) as { id: string; name: string };
 };
 
+// owner として、email のユーザーを project のメンバーに招待する。
+// 前準備で失敗したまま進むと、後ろの expect で無関係な理由で落ちて原因を追いにくいため、ここで確かめる
+const addMemberAs = async (
+  owner: { cookie: string },
+  project: { id: string },
+  email: string,
+) => {
+  const res = await app.request(`/projects/${project.id}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: owner.cookie },
+    body: JSON.stringify({ email }),
+  });
+  expect(res.status).toBe(201);
+};
+
 describe("/projects 配下の認証", () => {
   // 存在しない ID でよい。認証はプロジェクトを探すより前に行うため
   const projectId = "00000000-0000-4000-8000-000000000000";
@@ -149,12 +164,7 @@ describe("GET /projects", () => {
     const aliceProject = await createProjectAs(alice, "Alice Project");
     const sharedProject = await createProjectAs(bob, "Shared Project");
     await createProjectAs(bob, "Bob Project");
-    // 招待 API はまだないので、alice を bob のプロジェクトの member として直接登録する
-    await db.insert(projectMembers).values({
-      projectId: sharedProject.id,
-      userId: alice.id,
-      role: "member",
-    });
+    await addMemberAs(bob, sharedProject, "alice@example.com");
 
     const res = await app.request("/projects", {
       headers: { Cookie: alice.cookie },
@@ -191,10 +201,7 @@ describe("GET /projects/:projectId", () => {
     const alice = await signupAs("alice@example.com");
     const bob = await signupAs("bob@example.com");
     const project = await createProjectAs(alice, "Website Renewal");
-    // 招待 API はまだないので、bob を member として直接登録する
-    await db
-      .insert(projectMembers)
-      .values({ projectId: project.id, userId: bob.id, role: "member" });
+    await addMemberAs(alice, project, "bob@example.com");
 
     const ownerRes = await app.request(`/projects/${project.id}`, {
       headers: { Cookie: alice.cookie },
@@ -257,7 +264,7 @@ describe("GET /projects/:projectId/members", () => {
     const bob = await signupAs("bob@example.com");
     const carol = await signupAs("carol@example.com");
     const project = await createProjectAs(alice, "Website Renewal");
-    // 招待 API はまだないので直接登録する。INSERT の順と加わった日時の順をわざと逆にし、
+    // 加わった日時を指定するため、招待 API ではなく直接登録する。INSERT の順と加わった日時の順をわざと逆にし、
     // INSERT した順ではなく createdAt の順に並べていることを確かめる
     await db.insert(projectMembers).values({
       projectId: project.id,
@@ -327,12 +334,9 @@ describe("PATCH /projects/:projectId", () => {
 describe("DELETE /projects/:projectId", () => {
   it("owner が呼ぶと 204 を返し、プロジェクトとそのメンバー情報を消す", async () => {
     const alice = await signupAs("alice@example.com");
-    const bob = await signupAs("bob@example.com");
+    await signupAs("bob@example.com");
     const project = await createProjectAs(alice, "Website Renewal");
-    // 招待 API はまだないので、bob を member として直接登録する
-    await db
-      .insert(projectMembers)
-      .values({ projectId: project.id, userId: bob.id, role: "member" });
+    await addMemberAs(alice, project, "bob@example.com");
 
     const res = await app.request(`/projects/${project.id}`, {
       method: "DELETE",
@@ -363,10 +367,7 @@ describe("owner だけができる操作", () => {
       const alice = await signupAs("alice@example.com");
       const bob = await signupAs("bob@example.com");
       const project = await createProjectAs(alice, "Website Renewal");
-      // 招待 API はまだないので、bob を member として直接登録する
-      await db
-        .insert(projectMembers)
-        .values({ projectId: project.id, userId: bob.id, role: "member" });
+      await addMemberAs(alice, project, "bob@example.com");
 
       const res = await app.request(`/projects/${project.id}`, {
         method,
