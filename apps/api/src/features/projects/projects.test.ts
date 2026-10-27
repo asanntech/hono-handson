@@ -17,6 +17,16 @@ const signupAs = async (email: string) => {
   return { id: id as string, cookie: `token=${cookie.value}` };
 };
 
+// user としてプロジェクトを作り、作ったプロジェクトの { id, name } を返す。user は owner になる
+const createProjectAs = async (user: { cookie: string }, name: string) => {
+  const res = await app.request("/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: user.cookie },
+    body: JSON.stringify({ name }),
+  });
+  return (await res.json()) as { id: string; name: string };
+};
+
 describe("/projects 配下の認証", () => {
   // 存在しない ID でよい。認証はプロジェクトを探すより前に行うため
   const projectId = "00000000-0000-4000-8000-000000000000";
@@ -136,20 +146,9 @@ describe("GET /projects", () => {
     const alice = await signupAs("alice@example.com");
     const bob = await signupAs("bob@example.com");
 
-    const createProject = async (cookie: string, name: string) => {
-      const res = await app.request("/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: cookie,
-        },
-        body: JSON.stringify({ name }),
-      });
-      return res.json();
-    };
-    const aliceProject = await createProject(alice.cookie, "Alice Project");
-    const sharedProject = await createProject(bob.cookie, "Shared Project");
-    await createProject(bob.cookie, "Bob Project");
+    const aliceProject = await createProjectAs(alice, "Alice Project");
+    const sharedProject = await createProjectAs(bob, "Shared Project");
+    await createProjectAs(bob, "Bob Project");
     // 招待 API はまだないので、alice を bob のプロジェクトの member として直接登録する
     await db.insert(projectMembers).values({
       projectId: sharedProject.id,
@@ -176,14 +175,7 @@ describe("GET /projects", () => {
   it("メンバーになっているプロジェクトが 1 件もなければ、他人のプロジェクトがあっても空の配列を返す", async () => {
     const alice = await signupAs("alice@example.com");
     const bob = await signupAs("bob@example.com");
-    await app.request("/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: bob.cookie,
-      },
-      body: JSON.stringify({ name: "Bob Project" }),
-    });
+    await createProjectAs(bob, "Bob Project");
 
     const res = await app.request("/projects", {
       headers: { Cookie: alice.cookie },
@@ -198,15 +190,7 @@ describe("GET /projects/:projectId", () => {
   it("owner も member も 200 と { id, name } を受け取る", async () => {
     const alice = await signupAs("alice@example.com");
     const bob = await signupAs("bob@example.com");
-    const createRes = await app.request("/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: alice.cookie,
-      },
-      body: JSON.stringify({ name: "Website Renewal" }),
-    });
-    const project = await createRes.json();
+    const project = await createProjectAs(alice, "Website Renewal");
     // 招待 API はまだないので、bob を member として直接登録する
     await db
       .insert(projectMembers)
@@ -234,15 +218,7 @@ describe("GET /projects/:projectId", () => {
   it("メンバーでなければ、存在しない ID を指定したときと同じ 404 を返す", async () => {
     const alice = await signupAs("alice@example.com");
     const carol = await signupAs("carol@example.com");
-    const createRes = await app.request("/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: alice.cookie,
-      },
-      body: JSON.stringify({ name: "Website Renewal" }),
-    });
-    const project = await createRes.json();
+    const project = await createProjectAs(alice, "Website Renewal");
 
     const nonMemberRes = await app.request(`/projects/${project.id}`, {
       headers: { Cookie: carol.cookie },
@@ -280,12 +256,7 @@ describe("GET /projects/:projectId/members", () => {
     const alice = await signupAs("alice@example.com");
     const bob = await signupAs("bob@example.com");
     const carol = await signupAs("carol@example.com");
-    const createRes = await app.request("/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
-      body: JSON.stringify({ name: "Website Renewal" }),
-    });
-    const project = await createRes.json();
+    const project = await createProjectAs(alice, "Website Renewal");
     // 招待 API はまだないので直接登録する。INSERT の順と加わった日時の順をわざと逆にし、
     // INSERT した順ではなく createdAt の順に並べていることを確かめる
     await db.insert(projectMembers).values({
@@ -317,12 +288,7 @@ describe("GET /projects/:projectId/members", () => {
 describe("PATCH /projects/:projectId", () => {
   it("owner が name を送ると 200 と更新後の { id, name } を返す", async () => {
     const alice = await signupAs("alice@example.com");
-    const createRes = await app.request("/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
-      body: JSON.stringify({ name: "Website Renewal" }),
-    });
-    const project = await createRes.json();
+    const project = await createProjectAs(alice, "Website Renewal");
 
     const res = await app.request(`/projects/${project.id}`, {
       method: "PATCH",
