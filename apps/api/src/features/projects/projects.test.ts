@@ -253,3 +253,58 @@ describe("GET /projects", () => {
     expect(await res.json()).toEqual([]);
   });
 });
+
+describe("GET /projects/:projectId", () => {
+  it("owner も member も 200 と { id, name } を受け取る", async () => {
+    const aliceSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const [aliceCookie] = parseSetCookie(aliceSignupRes);
+    const bobSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "bob@example.com",
+        password: "password123",
+      }),
+    });
+    const bob = await bobSignupRes.json();
+    const [bobCookie] = parseSetCookie(bobSignupRes);
+    const createRes = await app.request("/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `token=${aliceCookie.value}`,
+      },
+      body: JSON.stringify({ name: "Website Renewal" }),
+    });
+    const project = await createRes.json();
+    // 招待 API はまだないので、bob を member として直接登録する
+    await db
+      .insert(projectMembers)
+      .values({ projectId: project.id, userId: bob.id, role: "member" });
+
+    const ownerRes = await app.request(`/projects/${project.id}`, {
+      headers: { Cookie: `token=${aliceCookie.value}` },
+    });
+    const memberRes = await app.request(`/projects/${project.id}`, {
+      headers: { Cookie: `token=${bobCookie.value}` },
+    });
+
+    expect(ownerRes.status).toBe(200);
+    expect(await ownerRes.json()).toEqual({
+      id: project.id,
+      name: "Website Renewal",
+    });
+    expect(memberRes.status).toBe(200);
+    expect(await memberRes.json()).toEqual({
+      id: project.id,
+      name: "Website Renewal",
+    });
+  });
+});

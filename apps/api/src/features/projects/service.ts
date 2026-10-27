@@ -21,3 +21,11 @@ export const listProjects = (userId: string) =>
     .from(projects)
     .innerJoin(projectMembers, eq(projectMembers.projectId, projects.id))
     .where(eq(projectMembers.userId, userId));
+
+export const findProject = async (id: string) => {
+  const [project] = await db
+    .select({ id: projects.id, name: projects.name })
+    .from(projects)
+    .where(eq(projects.id, id));
+  return project;
+};
