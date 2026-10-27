@@ -365,3 +365,33 @@ describe("owner だけができる操作", () => {
     },
   );
 });
+
+describe("メンバーでないユーザー", () => {
+  it.each([
+    { method: "PATCH", path: "", body: { name: "Hijacked" } },
+    { method: "DELETE", path: "", body: undefined },
+    { method: "GET", path: "/members", body: undefined },
+  ])(
+    "$method /projects/:projectId$path を呼ぶと 404 を返し、プロジェクトを変更しない",
+    async ({ method, path, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const carol = await signupAs("carol@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+
+      const res = await app.request(`/projects/${project.id}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json", Cookie: carol.cookie },
+        body: body && JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: projects.id, name: projects.name })
+          .from(projects)
+          .where(eq(projects.id, project.id)),
+      ).toEqual([{ id: project.id, name: "Website Renewal" }]);
+    },
+  );
+});
