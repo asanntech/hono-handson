@@ -92,3 +92,14 @@ export const addMember = async (projectId: string, email: string) => {
     throw error;
   }
 };
+
+export const removeMember = async (projectId: string, userId: string) => {
+  await db
+    .delete(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, projectId),
+        eq(projectMembers.userId, userId),
+      ),
+    );
+};

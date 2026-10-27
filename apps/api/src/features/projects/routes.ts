@@ -10,6 +10,7 @@ import {
   findProject,
   listMembers,
   listProjects,
+  removeMember,
   updateProject,
 } from "./service.ts";
 
@@ -72,4 +73,8 @@ export const projects = new Hono()
       );
       return c.json(member, 201);
     },
-  );
+  )
+  .delete("/:projectId/members/:userId", async (c) => {
+    await removeMember(c.req.param("projectId"), c.req.param("userId"));
+    return c.body(null, 204);
+  });

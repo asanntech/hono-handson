@@ -574,3 +574,30 @@ describe("POST /projects/:projectId/members", () => {
     expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
   });
 });
+
+describe("DELETE /projects/:projectId/members/:userId", () => {
+  it("owner が member を外すと 204 を返し、外された人はメンバー一覧から消え、以後そのプロジェクトに 404 を受け取る", async () => {
+    const alice = await signupAs("alice@example.com");
+    const bob = await signupAs("bob@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await addMemberAs(alice, project, "bob@example.com");
+
+    const res = await app.request(`/projects/${project.id}/members/${bob.id}`, {
+      method: "DELETE",
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(204);
+    expect(await res.text()).toBe("");
+    const membersRes = await app.request(`/projects/${project.id}/members`, {
+      headers: { Cookie: alice.cookie },
+    });
+    expect(await membersRes.json()).toEqual([
+      { userId: alice.id, email: "alice@example.com", role: "owner" },
+    ]);
+    const bobRes = await app.request(`/projects/${project.id}`, {
+      headers: { Cookie: bob.cookie },
+    });
+    expect(bobRes.status).toBe(404);
+  });
+});
