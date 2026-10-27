@@ -2,6 +2,7 @@ import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { verify } from "hono/jwt";
+import { z } from "zod";
 import { env } from "../env.ts";
 
 // JWT を入れる Cookie の名前。発行する側（auth の routes）と読む側（このミドルウェア）で共有する
@@ -20,10 +21,12 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(
     const payload = await verify(token, env.JWT_SECRET, "HS256").catch(() => {
       throw new HTTPException(401);
     });
-    if (typeof payload.sub !== "string") {
+    // users.id は uuid 型。UUID でない値のまま後続に渡すと、DB の型エラーで 500 になる
+    const sub = z.uuid().safeParse(payload.sub);
+    if (!sub.success) {
       throw new HTTPException(401);
     }
-    c.set("userId", payload.sub);
+    c.set("userId", sub.data);
     await next();
   },
 );

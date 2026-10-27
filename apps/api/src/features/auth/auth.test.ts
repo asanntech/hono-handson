@@ -343,6 +343,15 @@ describe("GET /auth/me", () => {
           "HS256",
         ),
     },
+    {
+      case: "sub が UUID でない JWT",
+      token: () =>
+        sign(
+          { sub: "abc", exp: Math.floor(Date.now() / 1000) + 60 },
+          env.JWT_SECRET,
+          "HS256",
+        ),
+    },
   ])("$case の Cookie なら 401 を返す", async ({ token }) => {
     const signupRes = await app.request("/auth/signup", {
       method: "POST",
