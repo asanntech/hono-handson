@@ -151,3 +151,69 @@ describe("POST /projects", () => {
     },
   );
 });
+
+describe("GET /projects", () => {
+  it("自分がメンバーになっているプロジェクトだけを、owner か member かに関わらず返す", async () => {
+    const aliceSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const alice = await aliceSignupRes.json();
+    const [aliceCookie] = parseSetCookie(aliceSignupRes);
+    const bobSignupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "bob@example.com",
+        password: "password123",
+      }),
+    });
+    const [bobCookie] = parseSetCookie(bobSignupRes);
+
+    const createProject = async (cookie: string, name: string) => {
+      const res = await app.request("/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `token=${cookie}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      return res.json();
+    };
+    const aliceProject = await createProject(
+      aliceCookie.value,
+      "Alice Project",
+    );
+    const sharedProject = await createProject(
+      bobCookie.value,
+      "Shared Project",
+    );
+    await createProject(bobCookie.value, "Bob Project");
+    // 招待 API はまだないので、alice を bob のプロジェクトの member として直接登録する
+    await db.insert(projectMembers).values({
+      projectId: sharedProject.id,
+      userId: alice.id,
+      role: "member",
+    });
+
+    const res = await app.request("/projects", {
+      headers: { Cookie: `token=${aliceCookie.value}` },
+    });
+
+    expect(res.status).toBe(200);
+    // 並び順はこの章では決めない（第6章のページネーションで決める）
+    const body = await res.json();
+    expect(body).toHaveLength(2);
+    expect(body).toEqual(
+      expect.arrayContaining([
+        { id: aliceProject.id, name: "Alice Project" },
+        { id: sharedProject.id, name: "Shared Project" },
+      ]),
+    );
+  });
+});

@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "../../db/client.ts";
 import { projectMembers, projects } from "../../db/schema.ts";
 
@@ -13,3 +14,10 @@ export const createProject = (input: { name: string; userId: string }) =>
       .values({ projectId: project.id, userId: input.userId, role: "owner" });
     return project;
   });
+
+export const listProjects = (userId: string) =>
+  db
+    .select({ id: projects.id, name: projects.name })
+    .from(projects)
+    .innerJoin(projectMembers, eq(projectMembers.projectId, projects.id))
+    .where(eq(projectMembers.userId, userId));
