@@ -90,9 +90,38 @@ describe("POST /projects", () => {
     });
   });
 
+  it("name の前後に空白があれば、落としてから保存して返す", async () => {
+    const signupRes = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const [cookie] = parseSetCookie(signupRes);
+
+    const res = await app.request("/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `token=${cookie.value}`,
+      },
+      body: JSON.stringify({ name: "  Website Renewal  " }),
+    });
+
+    expect(res.status).toBe(201);
+    // レスポンスは INSERT ... RETURNING で返した、保存済みの値
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      name: "Website Renewal",
+    });
+  });
+
   it.each([
     { case: "101 文字", body: { name: "a".repeat(101) } },
     { case: "空文字", body: { name: "" } },
+    { case: "空白だけ", body: { name: "   " } },
     { case: "未指定", body: {} },
   ])(
     "name が $case なら 400 を返し、プロジェクトを作らない",

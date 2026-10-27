@@ -5,7 +5,8 @@ import { validator } from "../../middleware/validator.ts";
 import { createProject } from "./service.ts";
 
 const projectSchema = z.object({
-  name: z.string().min(1).max(100),
+  // trim を先に置くと、空白を落とした後の文字数で min / max を判定する。空白だけの name は空文字になり弾かれる
+  name: z.string().trim().min(1).max(100),
 });
 
 // /projects 配下はすべてログインが必要。ルートごとに付けると、新しいルートで付け忘れるおそれがある。
