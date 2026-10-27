@@ -394,4 +394,20 @@ describe("メンバーでないユーザー", () => {
       ).toEqual([{ id: project.id, name: "Website Renewal" }]);
     },
   );
+
+  it("不正な body で PATCH しても、400 ではなく 404 を返す（認可をバリデーションより先に行う）", async () => {
+    const alice = await signupAs("alice@example.com");
+    const carol = await signupAs("carol@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: carol.cookie },
+      body: JSON.stringify({ name: "" }),
+    });
+
+    // 400 を返すと、メンバーでない人に「この ID のプロジェクトは存在する」と伝わってしまう
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+  });
 });
