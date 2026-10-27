@@ -2,8 +2,8 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { sign } from "hono/jwt";
-import postgres from "postgres";
 import { db } from "../../db/client.ts";
+import { isUniqueViolation } from "../../db/errors.ts";
 import { users } from "../../db/schema.ts";
 import { env } from "../../env.ts";
 
@@ -29,12 +29,6 @@ export const signup = async (input: { email: string; password: string }) => {
     throw error;
   }
 };
-
-// Drizzle は DB のエラーを cause に包んで投げる。23505 は PostgreSQL の unique_violation
-const isUniqueViolation = (error: unknown) =>
-  error instanceof Error &&
-  error.cause instanceof postgres.PostgresError &&
-  error.cause.code === "23505";
 
 export const login = async (input: { email: string; password: string }) => {
   const [user] = await db
