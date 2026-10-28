@@ -344,6 +344,63 @@ describe("/projects/:projectId/tasks/:taskId/comments で見つからないタ�
   );
 });
 
+describe("/projects/:projectId/tasks/:taskId/comments/:commentId で見つからないコメント", () => {
+  const methods = [
+    { method: "PATCH", body: { body: "Hijacked" } },
+    { method: "DELETE" },
+  ];
+  // 呼ぶ人はコメントを書いた本人。別のタスクのコメントは、パスのタスクからは見えないものとして扱う
+  const commentIds = [
+    {
+      case: "別のタスクのコメント ID",
+      commentIdOf: (otherTaskComment: { id: string }) => otherTaskComment.id,
+    },
+    {
+      case: "存在しない ID",
+      commentIdOf: () => "00000000-0000-4000-8000-000000000000",
+    },
+    { case: "UUID の形でない ID", commentIdOf: () => "not-a-uuid" },
+  ];
+
+  it.each(
+    methods.flatMap((method) => commentIds.map((id) => ({ ...method, ...id }))),
+  )(
+    "$method で$case を指定すると 404 を返し、コメントを変えない",
+    async ({ method, body, commentIdOf }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const task = await createTaskAs(alice, project.id, "Design the top page");
+      const otherTask = await createTaskAs(alice, project.id, "Write the copy");
+      const createRes = await app.request(
+        `/projects/${project.id}/tasks/${otherTask.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: JSON.stringify({ body: "Looks good to me" }),
+        },
+      );
+      const otherTaskComment = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments/${commentIdOf(otherTaskComment)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: comments.id, body: comments.body })
+          .from(comments),
+      ).toEqual([{ id: otherTaskComment.id, body: "Looks good to me" }]);
+    },
+  );
+});
+
 describe("タスクとプロジェクトの削除", () => {
   it.each([
     {

@@ -1,3 +1,4 @@
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
@@ -33,6 +34,18 @@ const requireTask = createMiddleware<{
   await next();
 });
 
+// comments.id は uuid 型。UUID でない値のまま問い合わせると、DB の型エラーで 500 になる。
+// UUID の形でない ID が指すコメントはないので、400 ではなく見つからないとして扱う
+const commentParamValidator = zValidator(
+  "param",
+  z.object({ commentId: z.uuid() }),
+  (result) => {
+    if (!result.success) {
+      throw new HTTPException(404);
+    }
+  },
+);
+
 // tasks のルートから /projects/:projectId/tasks/:taskId/comments につなぐ。
 // ログインとメンバーの確認は、親の projects と tasks のミドルウェアが行う。
 // comments の操作はどれもタスクがそのプロジェクトのものである必要があるので、先頭でまとめて requireTask を掛ける
@@ -50,15 +63,25 @@ export const comments = new Hono()
     const taskComments = await listComments(c.get("taskId"));
     return c.json(taskComments, 200);
   })
-  .patch("/:commentId", validator("json", commentSchema), async (c) => {
-    const comment = await updateComment(
-      c.req.param("commentId"),
+  .patch(
+    "/:commentId",
+    commentParamValidator,
+    validator("json", commentSchema),
+    async (c) => {
+      const comment = await updateComment(
+        c.get("taskId"),
+        c.req.valid("param").commentId,
+        c.get("userId"),
+        c.req.valid("json"),
+      );
+      return c.json(comment, 200);
+    },
+  )
+  .delete("/:commentId", commentParamValidator, async (c) => {
+    await deleteComment(
+      c.get("taskId"),
+      c.req.valid("param").commentId,
       c.get("userId"),
-      c.req.valid("json"),
     );
-    return c.json(comment, 200);
-  })
-  .delete("/:commentId", async (c) => {
-    await deleteComment(c.req.param("commentId"), c.get("userId"));
     return c.body(null, 204);
   });
