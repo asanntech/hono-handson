@@ -20,8 +20,11 @@ const createTaskSchema = z.object({
   status: z.enum(taskStatus.enumValues).optional(),
 });
 
-// PATCH は送った項目だけを更新する
-const updateTaskSchema = createTaskSchema.partial();
+// PATCH は送った項目だけを更新する。1 つも送られなければ更新する内容がないので 400 にする
+// （そのまま UPDATE すると、Drizzle が SET 句を作れずに例外を投げて 500 になる）
+const updateTaskSchema = createTaskSchema
+  .partial()
+  .refine((input) => Object.values(input).some((value) => value !== undefined));
 
 const listTasksQuerySchema = z.object({
   // クエリパラメータは文字列で届くため、coerce で数値に変換してから検証する

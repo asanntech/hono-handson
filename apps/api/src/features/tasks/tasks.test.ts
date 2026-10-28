@@ -541,6 +541,43 @@ describe("PATCH /projects/:projectId/tasks/:taskId", () => {
     );
     expect(await getRes.json()).toEqual(updated);
   });
+
+  it.each([
+    { case: "項目を 1 つも送らない", body: {} },
+    { case: "title が空白だけ", body: { title: "   " } },
+    { case: "title が 201 文字", body: { title: "a".repeat(201) } },
+    {
+      case: "description が 2001 文字",
+      body: { description: "a".repeat(2001) },
+    },
+    { case: "status が不正な値", body: { status: "archived" } },
+  ])("$case なら 400 を返し、タスクを変えない", async ({ body }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify(body),
+      },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(await getRes.json()).toEqual(created);
+  });
 });
 
 describe("DELETE /projects/:projectId/tasks/:taskId", () => {
