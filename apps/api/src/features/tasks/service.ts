@@ -1,5 +1,6 @@
 import { and, desc, eq, lt, or } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import { db } from "../../db/client.ts";
 import { type taskStatus, tasks } from "../../db/schema.ts";
 
@@ -13,7 +14,9 @@ const taskColumns = {
 };
 
 // カーソルは、前のページの最後のタスクの { createdAt, id }。
-// クライアントには中身を意識させないよう、JSON を base64url で包んだ文字列にする
+// レスポンスの nextCursor として返し、クライアントは次のリクエストの
+// ?cursor= にそのまま付けて送り返す。
+// クライアントに中身を意識させないよう、JSON を base64url で包んだ文字列にする
 type Cursor = { createdAt: Date; id: string };
 
 const encodeCursor = (cursor: Cursor) =>
@@ -24,11 +27,20 @@ const encodeCursor = (cursor: Cursor) =>
     }),
   ).toString("base64url");
 
+const cursorSchema = z.object({
+  createdAt: z.iso.datetime().transform((value) => new Date(value)),
+  id: z.uuid(),
+});
+
+// クライアントが手で作った値や壊れた値も届きうる。DB に問い合わせる前に形を確かめ、400 にする
 const decodeCursor = (value: string): Cursor => {
-  const { createdAt, id } = JSON.parse(
-    Buffer.from(value, "base64url").toString(),
-  );
-  return { createdAt: new Date(createdAt), id };
+  try {
+    return cursorSchema.parse(
+      JSON.parse(Buffer.from(value, "base64url").toString()),
+    );
+  } catch {
+    throw new HTTPException(400);
+  }
 };
 
 // クライアントが作成・更新で指定できる項目

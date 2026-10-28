@@ -436,6 +436,40 @@ describe("GET /projects/:projectId/tasks", () => {
 
     expect(res.status).toBe(200);
   });
+
+  // カーソルは API が発行した値をそのまま送り返してもらう前提。手で作られた値や壊れた値は 400 にする
+  const encode = (value: string) => Buffer.from(value).toString("base64url");
+  it.each([
+    { case: "cursor が base64url でない", cursor: "!!!" },
+    { case: "cursor の中身が JSON でない", cursor: encode("not json") },
+    { case: "cursor の中身が配列", cursor: encode("[]") },
+    {
+      case: "cursor の createdAt が日時でない",
+      cursor: encode(
+        JSON.stringify({
+          createdAt: "yesterday",
+          id: "00000000-0000-4000-8000-000000000000",
+        }),
+      ),
+    },
+    {
+      case: "cursor の id が UUID でない",
+      cursor: encode(
+        JSON.stringify({ createdAt: "2026-01-01T00:00:00.000Z", id: "1" }),
+      ),
+    },
+  ])("$case なら 400 を返す", async ({ cursor }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks?cursor=${cursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
 });
 
 describe("GET /projects/:projectId/tasks/:taskId", () => {
