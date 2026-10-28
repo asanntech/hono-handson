@@ -1,6 +1,8 @@
 import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it } from "vitest";
 import { app } from "../../app.ts";
+import { db } from "../../db/client.ts";
+import { comments } from "../../db/schema.ts";
 
 // ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
 const signupAs = async (email: string) => {
@@ -197,5 +199,36 @@ describe("DELETE /projects/:projectId/tasks/:taskId/comments/:commentId", () => 
       { headers: { Cookie: alice.cookie } },
     );
     expect(await listRes.json()).toEqual([]);
+  });
+});
+
+describe("タスクとプロジェクトの削除", () => {
+  it.each([
+    {
+      case: "タスク",
+      pathOf: (projectId: string, taskId: string) =>
+        `/projects/${projectId}/tasks/${taskId}`,
+    },
+    {
+      case: "プロジェクト",
+      pathOf: (projectId: string) => `/projects/${projectId}`,
+    },
+  ])("$case を削除すると、そのタスクのコメントも消える", async ({ pathOf }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const task = await createTaskAs(alice, project.id, "Design the top page");
+    await app.request(`/projects/${project.id}/tasks/${task.id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ body: "Looks good to me" }),
+    });
+
+    const res = await app.request(pathOf(project.id, task.id), {
+      method: "DELETE",
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(204);
+    expect(await db.select().from(comments)).toEqual([]);
   });
 });

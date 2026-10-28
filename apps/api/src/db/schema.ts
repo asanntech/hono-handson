@@ -86,9 +86,10 @@ export const comments = pgTable(
   "comments",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    // タスクを消したら、そのコメントも DB が一緒に消す。プロジェクトを消したときも、タスク経由で消える
     taskId: uuid("task_id")
       .notNull()
-      .references(() => tasks.id),
+      .references(() => tasks.id, { onDelete: "cascade" }),
     authorId: uuid("author_id")
       .notNull()
       .references(() => users.id),

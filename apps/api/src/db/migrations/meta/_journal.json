@@ -64,6 +64,13 @@
       "when": 1793175316069,
       "tag": "0008_add_comments_list_index",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793175832635,
+      "tag": "0009_cascade_comments_on_task_delete",
+      "breakpoints": true
     }
   ]
 }
