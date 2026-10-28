@@ -258,6 +258,26 @@ describe("GET /projects/:projectId/tasks", () => {
     expect(titles.toSorted()).toEqual(["Task A", "Task B", "Task C"]);
     expect(secondPage.nextCursor).toBeNull();
   });
+
+  it("limit を省略すると 20 件ずつ返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values(
+      Array.from({ length: 21 }, (_, i) => ({
+        projectId: project.id,
+        title: `Task ${i + 1}`,
+      })),
+    );
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+    const page = await res.json();
+    expect(page.items).toHaveLength(20);
+    expect(page.nextCursor).toEqual(expect.any(String));
+  });
 });
 
 describe("GET /projects/:projectId/tasks/:taskId", () => {
