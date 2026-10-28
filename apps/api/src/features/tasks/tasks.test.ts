@@ -1,0 +1,687 @@
+import { eq } from "drizzle-orm";
+import { parseSetCookie } from "set-cookie-parser";
+import { describe, expect, it } from "vitest";
+import { app } from "../../app.ts";
+import { db } from "../../db/client.ts";
+import { tasks } from "../../db/schema.ts";
+
+// ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
+const signupAs = async (email: string) => {
+  const res = await app.request("/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "password123" }),
+  });
+  const { id } = await res.json();
+  const [cookie] = parseSetCookie(res);
+  return { id: id as string, cookie: `token=${cookie.value}` };
+};
+
+// user としてプロジェクトを作り、作ったプロジェクトの { id, name } を返す。user は owner になる
+const createProjectAs = async (user: { cookie: string }, name: string) => {
+  const res = await app.request("/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: user.cookie },
+    body: JSON.stringify({ name }),
+  });
+  return (await res.json()) as { id: string; name: string };
+};
+
+describe("/projects/:projectId/tasks 配下の認証", () => {
+  // 存在しない ID でよい。認証はプロジェクトやタスクを探すより前に行うため
+  const projectId = "00000000-0000-4000-8000-000000000000";
+  const taskId = "00000000-0000-4000-8000-000000000001";
+
+  it.each([
+    { method: "POST", path: `/projects/${projectId}/tasks` },
+    { method: "GET", path: `/projects/${projectId}/tasks` },
+    { method: "GET", path: `/projects/${projectId}/tasks/${taskId}` },
+    { method: "PATCH", path: `/projects/${projectId}/tasks/${taskId}` },
+    { method: "DELETE", path: `/projects/${projectId}/tasks/${taskId}` },
+  ])(
+    "Cookie を付けずに $method $path を呼ぶと 401 を返す",
+    async ({ method, path }) => {
+      const res = await app.request(path, { method });
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+    },
+  );
+});
+
+describe("メンバーでないユーザー", () => {
+  it.each([
+    { method: "POST", path: "", body: { title: "Hijacked" } },
+    { method: "GET", path: "" },
+    { method: "GET", path: "/:taskId" },
+    { method: "PATCH", path: "/:taskId", body: { title: "Hijacked" } },
+    { method: "DELETE", path: "/:taskId" },
+  ])(
+    "$method /projects/:projectId/tasks$path を呼ぶと 404 を返し、タスクを変えない",
+    async ({ method, path, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const createRes = await app.request(`/projects/${project.id}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ title: "Design the top page" }),
+      });
+      const created = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks${path.replace(":taskId", created.id)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: tasks.id, title: tasks.title })
+          .from(tasks)
+          .where(eq(tasks.projectId, project.id)),
+      ).toEqual([{ id: created.id, title: "Design the top page" }]);
+    },
+  );
+});
+
+describe("POST /projects/:projectId/tasks", () => {
+  it('メンバーが title を送ると 201 と { id, title, description: "", status: "todo", createdAt } を返す', async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      title: "Design the top page",
+      description: "",
+      status: "todo",
+      createdAt: expect.any(String),
+    });
+  });
+
+  it("description と status を指定すると、その値で保存して返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({
+        title: "Design the top page",
+        description: "Use the new brand colors",
+        status: "in_progress",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      title: "Design the top page",
+      description: "Use the new brand colors",
+      status: "in_progress",
+      createdAt: expect.any(String),
+    });
+  });
+
+  it("title の前後の空白を落として保存し、200 文字の title も受け付ける", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const trimmedRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "  Design the top page  " }),
+    });
+    const longRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "a".repeat(200) }),
+    });
+
+    expect(trimmedRes.status).toBe(201);
+    expect((await trimmedRes.json()).title).toBe("Design the top page");
+    expect(longRes.status).toBe(201);
+    expect((await longRes.json()).title).toBe("a".repeat(200));
+  });
+
+  it.each([
+    { case: "title が空", body: { title: "" } },
+    { case: "title が空白だけ", body: { title: "   " } },
+    { case: "title が 201 文字", body: { title: "a".repeat(201) } },
+    {
+      case: "description が 2001 文字",
+      body: { title: "Design", description: "a".repeat(2001) },
+    },
+    {
+      case: "status が不正な値",
+      body: { title: "Design", status: "archived" },
+    },
+  ])("$case なら 400 を返し、タスクを作らない", async ({ body }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+    expect(await db.select().from(tasks)).toEqual([]);
+  });
+});
+
+describe("GET /projects/:projectId/tasks", () => {
+  it("そのプロジェクトのタスクだけを新しい順に { items, nextCursor: null } で返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const otherProject = await createProjectAs(alice, "Mobile App");
+    // 並び順を確かめるため、作成日時を指定して DB に直接入れる
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Older task",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Newer task",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: otherProject.id,
+        title: "Task in another project",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    ]);
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      items: [
+        {
+          id: expect.any(String),
+          title: "Newer task",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: expect.any(String),
+          title: "Older task",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it("limit を指定すると limit 件と nextCursor を返し、nextCursor で続きを取得でき、最後のページでは nextCursor が null になる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Task 1",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Task 2",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Task 3",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(firstRes.status).toBe(200);
+    const firstPage = await firstRes.json();
+    expect(
+      firstPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Task 3", "Task 2"]);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(secondRes.status).toBe(200);
+    const secondPage = await secondRes.json();
+    expect(
+      secondPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Task 1"]);
+    expect(secondPage.nextCursor).toBeNull();
+  });
+
+  it("status を指定すると、その status のタスクだけを返し、絞り込んだままページングできる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Todo 1",
+        status: "todo",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Done 1",
+        status: "done",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Todo 2",
+        status: "todo",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Todo 3",
+        status: "todo",
+        createdAt: new Date("2026-01-04T00:00:00.000Z"),
+      },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?status=todo&limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(firstRes.status).toBe(200);
+    const firstPage = await firstRes.json();
+    expect(
+      firstPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Todo 3", "Todo 2"]);
+
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?status=todo&limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(secondRes.status).toBe(200);
+    expect(await secondRes.json()).toEqual({
+      items: [
+        {
+          id: expect.any(String),
+          title: "Todo 1",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it("createdAt が同じタスクが limit をまたいで並んでいても、ページの境目で重複も欠落もしない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    // 1 つの INSERT の中では now() が同じ値になるため、3 件とも createdAt が同じになる。
+    // DB の既定値で作成日時を付けるので、API で作ったときと同じ精度の値が入る
+    await db.insert(tasks).values([
+      { projectId: project.id, title: "Task A" },
+      { projectId: project.id, title: "Task B" },
+      { projectId: project.id, title: "Task C" },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    const firstPage = await firstRes.json();
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    const secondPage = await secondRes.json();
+
+    const titles = [...firstPage.items, ...secondPage.items].map(
+      (task: { title: string }) => task.title,
+    );
+    // 同じ時刻のタスクどうしの順番は id で決まり、id はランダムなので、並びではなく顔ぶれを確かめる
+    expect(titles.toSorted()).toEqual(["Task A", "Task B", "Task C"]);
+    expect(secondPage.nextCursor).toBeNull();
+  });
+
+  it("limit を省略すると 20 件ずつ返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values(
+      Array.from({ length: 21 }, (_, i) => ({
+        projectId: project.id,
+        title: `Task ${i + 1}`,
+      })),
+    );
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+    const page = await res.json();
+    expect(page.items).toHaveLength(20);
+    expect(page.nextCursor).toEqual(expect.any(String));
+  });
+
+  it.each([
+    { query: "limit=0" },
+    { query: "limit=101" },
+    { query: "limit=1.5" },
+    { query: "limit=abc" },
+  ])(
+    "?$query なら 400 と、指定できる limit の範囲を返す",
+    async ({ query }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+
+      const res = await app.request(`/projects/${project.id}/tasks?${query}`, {
+        headers: { Cookie: alice.cookie },
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: { message: "limit must be an integer between 1 and 100" },
+      });
+    },
+  );
+
+  it("?status=archived なら 400 を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks?status=archived`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
+
+  it("limit が 100 なら受け付ける", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks?limit=100`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  // カーソルは API が発行した値をそのまま送り返してもらう前提。手で作られた値や壊れた値は 400 にする
+  const encode = (value: string) => Buffer.from(value).toString("base64url");
+  it.each([
+    { case: "cursor が base64url でない", cursor: "!!!" },
+    { case: "cursor の中身が JSON でない", cursor: encode("not json") },
+    { case: "cursor の中身が配列", cursor: encode("[]") },
+    {
+      case: "cursor の createdAt が日時でない",
+      cursor: encode(
+        JSON.stringify({
+          createdAt: "yesterday",
+          id: "00000000-0000-4000-8000-000000000000",
+        }),
+      ),
+    },
+    {
+      case: "cursor の id が UUID でない",
+      cursor: encode(
+        JSON.stringify({ createdAt: "2026-01-01T00:00:00.000Z", id: "1" }),
+      ),
+    },
+  ])("$case なら 400 を返す", async ({ cursor }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks?cursor=${cursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
+});
+
+describe("GET /projects/:projectId/tasks/:taskId", () => {
+  it("メンバーが呼ぶと 200 とタスクを返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({
+        title: "Design the top page",
+        description: "Use the new brand colors",
+      }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      id: created.id,
+      title: "Design the top page",
+      description: "Use the new brand colors",
+      status: "todo",
+      createdAt: created.createdAt,
+    });
+  });
+});
+
+describe("PATCH /projects/:projectId/tasks/:taskId", () => {
+  it("メンバーが一部の項目を送ると、送った項目だけを更新して 200 と更新後のタスクを返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({
+        title: "Design the top page",
+        description: "Use the new brand colors",
+      }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ status: "done" }),
+      },
+    );
+
+    const updated = {
+      id: created.id,
+      title: "Design the top page",
+      description: "Use the new brand colors",
+      status: "done",
+      createdAt: created.createdAt,
+    };
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(updated);
+
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(await getRes.json()).toEqual(updated);
+  });
+
+  it.each([
+    { case: "項目を 1 つも送らない", body: {} },
+    { case: "title が空白だけ", body: { title: "   " } },
+    { case: "title が 201 文字", body: { title: "a".repeat(201) } },
+    {
+      case: "description が 2001 文字",
+      body: { description: "a".repeat(2001) },
+    },
+    { case: "status が不正な値", body: { status: "archived" } },
+  ])("$case なら 400 を返し、タスクを変えない", async ({ body }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify(body),
+      },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(await getRes.json()).toEqual(created);
+  });
+});
+
+describe("DELETE /projects/:projectId/tasks/:taskId", () => {
+  it("メンバーが呼ぶと 204 を返し、以後そのタスクは 404 になる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { method: "DELETE", headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(204);
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(getRes.status).toBe(404);
+    expect(await getRes.json()).toEqual({ error: { message: "Not Found" } });
+  });
+});
+
+describe("/projects/:projectId/tasks/:taskId で見つからないタスク", () => {
+  const methods = [
+    { method: "GET" },
+    { method: "PATCH", body: { title: "Hijacked" } },
+    { method: "DELETE" },
+  ];
+  // 呼ぶ人は両方のプロジェクトのメンバー。別のプロジェクトのタスクは、パスのプロジェクトからは見えないものとして扱う
+  const taskIds = [
+    {
+      case: "別のプロジェクトのタスク ID",
+      taskIdOf: (otherProjectTask: { id: string }) => otherProjectTask.id,
+    },
+    {
+      case: "存在しない ID",
+      taskIdOf: () => "00000000-0000-4000-8000-000000000000",
+    },
+    { case: "UUID の形でない ID", taskIdOf: () => "not-a-uuid" },
+  ];
+
+  it.each(
+    methods.flatMap((method) => taskIds.map((id) => ({ ...method, ...id }))),
+  )(
+    "$method で$case を指定すると 404 を返し、タスクを変えない",
+    async ({ method, body, taskIdOf }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const otherProject = await createProjectAs(alice, "Mobile App");
+      const createRes = await app.request(
+        `/projects/${otherProject.id}/tasks`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: alice.cookie,
+          },
+          body: JSON.stringify({ title: "Design the top page" }),
+        },
+      );
+      const otherProjectTask = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${taskIdOf(otherProjectTask)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db.select({ id: tasks.id, title: tasks.title }).from(tasks),
+      ).toEqual([{ id: otherProjectTask.id, title: "Design the top page" }]);
+    },
+  );
+});
+
+describe("プロジェクトの削除", () => {
+  it("プロジェクトを削除すると、そのプロジェクトのタスクも消える", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "DELETE",
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(204);
+    expect(
+      await db.select().from(tasks).where(eq(tasks.projectId, project.id)),
+    ).toEqual([]);
+  });
+});
