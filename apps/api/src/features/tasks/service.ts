@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { db } from "../../db/client.ts";
@@ -73,12 +73,11 @@ export const listTasks = async (
       and(
         eq(tasks.projectId, projectId),
         query.status && eq(tasks.status, query.status),
-        // 並び順（createdAt の降順、同じなら id の降順）で、カーソルより後ろにあるタスクだけを取る
+        // 並び順（createdAt の降順、同じなら id の降順）で、カーソルより後ろにあるタスクだけを取る。
+        // 「createdAt < x OR (createdAt = x AND id < y)」と同じ意味だが、行値比較で書くと
+        // PostgreSQL が条件全体を索引の範囲として使い、カーソルの位置から直接読み始められる
         cursor &&
-          or(
-            lt(tasks.createdAt, cursor.createdAt),
-            and(eq(tasks.createdAt, cursor.createdAt), lt(tasks.id, cursor.id)),
-          ),
+          sql`(${tasks.createdAt}, ${tasks.id}) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
       ),
     )
     // 作成日時が同じタスクの順番も決まるよう、id を 2 つ目の並び順にする
