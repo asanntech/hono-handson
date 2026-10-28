@@ -53,6 +53,28 @@ const createTaskAs = async (
   return (await res.json()) as { id: string };
 };
 
+describe("/projects/:projectId/tasks/:taskId/comments 配下の認証", () => {
+  // 存在しない ID でよい。認証はプロジェクトやタスク、コメントを探すより前に行うため
+  const base =
+    "/projects/00000000-0000-4000-8000-000000000000/tasks/00000000-0000-4000-8000-000000000001/comments";
+  const commentId = "00000000-0000-4000-8000-000000000002";
+
+  it.each([
+    { method: "POST", path: base },
+    { method: "GET", path: base },
+    { method: "PATCH", path: `${base}/${commentId}` },
+    { method: "DELETE", path: `${base}/${commentId}` },
+  ])(
+    "Cookie を付けずに $method $path を呼ぶと 401 を返す",
+    async ({ method, path }) => {
+      const res = await app.request(path, { method });
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+    },
+  );
+});
+
 describe("POST /projects/:projectId/tasks/:taskId/comments", () => {
   it("メンバーが body を送ると 201 と { id, body, authorId, createdAt } を返す", async () => {
     const alice = await signupAs("alice@example.com");
