@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { InferResponseType } from "hono/client";
 import { HttpResponse, http } from "msw";
@@ -8,6 +8,7 @@ import { renderApp } from "../test/render.tsx";
 import { server } from "../test/server.ts";
 
 type LoginResponse = InferResponseType<typeof api.auth.login.$post, 200>;
+type MeResponse = InferResponseType<typeof api.auth.me.$get, 200>;
 
 test("正しいメールアドレスとパスワードでログインしたとき、プロジェクト一覧画面へ遷移する", async () => {
   let requestBody: unknown;
@@ -19,6 +20,12 @@ test("正しいメールアドレスとパスワードでログインしたと�
         email: "alice@example.com",
       });
     }),
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
   );
   const { router } = renderApp("/login");
   const user = userEvent.setup();
@@ -30,7 +37,10 @@ test("正しいメールアドレスとパスワードでログインしたと�
   await user.type(screen.getByLabelText("パスワード"), "password123");
   await user.click(screen.getByRole("button", { name: "ログイン" }));
 
-  await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+  expect(
+    await screen.findByRole("heading", { name: "プロジェクト" }),
+  ).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe("/projects");
   expect(requestBody).toEqual({
     email: "alice@example.com",
     password: "password123",
