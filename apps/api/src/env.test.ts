@@ -37,6 +37,21 @@ describe("parseEnv", () => {
     expect(env.DATABASE_URL).toBe(url);
   });
 
+  it("WEB_ORIGIN が指定されるとその値を返す", () => {
+    const env = parseEnv({
+      ...requiredEnv,
+      WEB_ORIGIN: "https://app.example.com",
+    });
+
+    expect(env.WEB_ORIGIN).toBe("https://app.example.com");
+  });
+
+  it("WEB_ORIGIN が未指定なら Vite の開発サーバーの http://localhost:5173 を既定値にする", () => {
+    const env = parseEnv(requiredEnv);
+
+    expect(env.WEB_ORIGIN).toBe("http://localhost:5173");
+  });
+
   it("PORT と NODE_ENV が未指定なら 3000 と development を既定値にする", () => {
     const env = parseEnv(requiredEnv);
 

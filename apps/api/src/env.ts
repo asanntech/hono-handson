@@ -7,6 +7,7 @@ const envSchema = z.object({
     .default("development"),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   JWT_SECRET: z.string().min(32),
+  WEB_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 export const parseEnv = (source: Record<string, string | undefined>) =>
