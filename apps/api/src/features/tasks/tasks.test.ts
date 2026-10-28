@@ -70,6 +70,27 @@ describe("POST /projects/:projectId/tasks", () => {
       createdAt: expect.any(String),
     });
   });
+
+  it("title の前後の空白を落として保存し、200 文字の title も受け付ける", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const trimmedRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "  Design the top page  " }),
+    });
+    const longRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "a".repeat(200) }),
+    });
+
+    expect(trimmedRes.status).toBe(201);
+    expect((await trimmedRes.json()).title).toBe("Design the top page");
+    expect(longRes.status).toBe(201);
+    expect((await longRes.json()).title).toBe("a".repeat(200));
+  });
 });
 
 describe("GET /projects/:projectId/tasks", () => {

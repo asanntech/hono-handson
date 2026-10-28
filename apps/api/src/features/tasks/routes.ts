@@ -12,7 +12,7 @@ import {
 } from "./service.ts";
 
 const createTaskSchema = z.object({
-  title: z.string(),
+  title: z.string().trim(),
   description: z.string().optional(),
   status: z.enum(taskStatus.enumValues).optional(),
 });
