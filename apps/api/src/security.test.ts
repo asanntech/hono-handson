@@ -75,4 +75,24 @@ describe("CSRF", () => {
       expect(res.headers.get("Set-Cookie")).toBeNull();
     },
   );
+
+  // WEB_ORIGIN は CORS で許可した SPA のオリジン。同一オリジンでなくても、自分たちのフロントエンドからの送信は通す
+  it.each([
+    ["同一オリジン", "http://localhost"],
+    ["WEB_ORIGIN", env.WEB_ORIGIN],
+  ])(
+    "%s から form 形式の POST が来たら通常どおり処理する",
+    async (_, origin) => {
+      const res = await app.request("/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Origin: origin,
+        },
+        body: "",
+      });
+
+      expect(res.status).toBe(204);
+    },
+  );
 });
