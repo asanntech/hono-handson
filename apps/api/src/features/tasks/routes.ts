@@ -1,4 +1,6 @@
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { taskStatus } from "../../db/schema.ts";
 import { requireMember } from "../../middleware/authorize.ts";
@@ -23,10 +25,27 @@ const updateTaskSchema = createTaskSchema.partial();
 
 const listTasksQuerySchema = z.object({
   // クエリパラメータは文字列で届くため、coerce で数値に変換してから検証する
-  limit: z.coerce.number().default(20),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().optional(),
   status: z.enum(taskStatus.enumValues).optional(),
 });
+
+// limit の上限は、API の型からは分からない。範囲外のときだけ、指定できる範囲をメッセージで伝える。
+// それ以外の失敗は、共通の validator と同じく Bad Request にそろえる
+const listTasksQueryValidator = zValidator(
+  "query",
+  listTasksQuerySchema,
+  (result) => {
+    if (!result.success) {
+      const message = result.error.issues.some(
+        (issue) => issue.path[0] === "limit",
+      )
+        ? "limit must be an integer between 1 and 100"
+        : undefined;
+      throw new HTTPException(400, { message });
+    }
+  },
+);
 
 // projects のルートから /projects/:projectId/tasks につなぐ。ログインの確認は projects 側の requireAuth が行う。
 // tasks の操作はどれもメンバーなら行えるので、ルートごとではなく先頭でまとめて requireMember を掛ける
@@ -36,7 +55,7 @@ export const tasks = new Hono()
     const task = await createTask(c.get("projectId"), c.req.valid("json"));
     return c.json(task, 201);
   })
-  .get("/", validator("query", listTasksQuerySchema), async (c) => {
+  .get("/", listTasksQueryValidator, async (c) => {
     const page = await listTasks(c.get("projectId"), c.req.valid("query"));
     return c.json(page, 200);
   })

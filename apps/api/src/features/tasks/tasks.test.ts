@@ -390,6 +390,52 @@ describe("GET /projects/:projectId/tasks", () => {
     expect(page.items).toHaveLength(20);
     expect(page.nextCursor).toEqual(expect.any(String));
   });
+
+  it.each([
+    { query: "limit=0" },
+    { query: "limit=101" },
+    { query: "limit=1.5" },
+    { query: "limit=abc" },
+  ])(
+    "?$query なら 400 と、指定できる limit の範囲を返す",
+    async ({ query }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+
+      const res = await app.request(`/projects/${project.id}/tasks?${query}`, {
+        headers: { Cookie: alice.cookie },
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: { message: "limit must be an integer between 1 and 100" },
+      });
+    },
+  );
+
+  it("?status=archived なら 400 を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks?status=archived`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+  });
+
+  it("limit が 100 なら受け付ける", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks?limit=100`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("GET /projects/:projectId/tasks/:taskId", () => {
