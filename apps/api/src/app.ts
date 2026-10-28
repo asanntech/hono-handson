@@ -11,7 +11,9 @@ import { projects } from "./features/projects/routes.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.ts";
 
 export const app = new Hono()
-  // ログと New Relic でリクエストを追えるよう、最初にリクエストIDを振り、X-Request-Id ヘッダーで返す
+  // ログと New Relic でリクエストを追えるよう、最初にリクエストIDを振り、X-Request-Id ヘッダーで返す。
+  // 前段のプロキシや SPA が振った ID でも追えるよう、受け取った X-Request-Id が英数字・_・-・= だけで
+  // 255 文字以下ならそのまま引き継ぐ（Hono の既定の動き）。それ以外の値はログを汚さないよう捨てて生成し直す
   .use(requestId())
   // 全レスポンスに、MIME スニッフィングや iframe への埋め込みを禁じるヘッダーを付ける
   .use(secureHeaders())
