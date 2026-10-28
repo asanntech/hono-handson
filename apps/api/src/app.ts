@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
@@ -21,6 +22,8 @@ export const app = new Hono()
         origin === new URL(c.req.url).origin || origin === env.WEB_ORIGIN,
     }),
   )
+  // 巨大なボディでメモリを使い切らせる攻撃を防ぐ。上限を超えた時点で読むのをやめ、413 を返す
+  .use(bodyLimit({ maxSize: 100 * 1024 }))
   .route("/health", health)
   .route("/auth", auth)
   .route("/projects", projects);

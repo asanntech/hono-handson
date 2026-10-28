@@ -96,3 +96,18 @@ describe("CSRF", () => {
     },
   );
 });
+
+describe("リクエストボディの上限", () => {
+  it("ボディが 100KB を超えると 413 を返す", async () => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "a".repeat(100 * 1024 + 1),
+    });
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({
+      error: { message: "Payload Too Large" },
+    });
+  });
+});
