@@ -386,7 +386,7 @@ describe("POST /auth/logout", () => {
 
     const res = await app.request("/auth/logout", {
       method: "POST",
-      headers: { Cookie: `token=${cookie.value}` },
+      headers: { Origin: "http://localhost", Cookie: `token=${cookie.value}` },
     });
 
     expect(res.status).toBe(204);

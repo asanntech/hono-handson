@@ -49,3 +49,30 @@ describe("CORS", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
+
+describe("CSRF", () => {
+  // 他サイトの <form> から送れる形式。JSON と違ってプリフライトが起きず、ブラウザは Cookie 付きでそのまま送ってしまう
+  it.each([
+    "application/x-www-form-urlencoded",
+    "multipart/form-data; boundary=x",
+    "text/plain",
+  ])(
+    "別オリジンから %s の POST が来たら 403 を返し、処理しない",
+    async (contentType) => {
+      const res = await app.request("/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": contentType,
+          Origin: "https://evil.example",
+          Cookie: "token=dummy",
+        },
+        body: "",
+      });
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: { message: "Forbidden" } });
+      // logout が処理されていれば、Cookie を消す Set-Cookie が返る
+      expect(res.headers.get("Set-Cookie")).toBeNull();
+    },
+  );
+});

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { env } from "./env.ts";
 import { auth } from "./features/auth/routes.ts";
@@ -12,6 +13,8 @@ export const app = new Hono()
   .use(secureHeaders())
   // プリフライトは Cookie を付けずに来るため、認証より前で応答する。Cookie を送れるよう credentials を許可する
   .use(cors({ origin: env.WEB_ORIGIN, credentials: true }))
+  // 他サイトの form から送れる形式の変更系リクエストは、Origin が同一オリジンでなければ拒否する
+  .use(csrf())
   .route("/health", health)
   .route("/auth", auth)
   .route("/projects", projects);
