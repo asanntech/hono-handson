@@ -57,6 +57,13 @@
       "when": 1793174545084,
       "tag": "0007_create_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793175316069,
+      "tag": "0008_add_comments_list_index",
+      "breakpoints": true
     }
   ]
 }

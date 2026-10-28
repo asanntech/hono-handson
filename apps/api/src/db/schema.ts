@@ -82,16 +82,29 @@ export const tasks = pgTable(
   ],
 );
 
-export const comments = pgTable("comments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  taskId: uuid("task_id")
-    .notNull()
-    .references(() => tasks.id),
-  authorId: uuid("author_id")
-    .notNull()
-    .references(() => users.id),
-  body: text("body").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // 一覧の絞り込み（taskId）と並び順（createdAt, id の昇順）に合わせ、並べ替えずに索引の順で読めるようにする。
+    // PostgreSQL は外部キーに索引を自動で張らないため、これがないとタスクのコメントを探すたびにテーブル全体を読む。
+    // 昇順は ORDER BY ... ASC も索引も NULLS LAST が既定で、向きがそろっているため nullsFirst() は要らない
+    index("comments_task_id_created_at_id_idx").on(
+      table.taskId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
