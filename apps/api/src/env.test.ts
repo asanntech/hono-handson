@@ -52,6 +52,13 @@ describe("parseEnv", () => {
     expect(env.WEB_ORIGIN).toBe("http://localhost:5173");
   });
 
+  it("LOG_MIN_LEVEL が指定されるとその値を返し、未指定なら info を既定値にする", () => {
+    expect(
+      parseEnv({ ...requiredEnv, LOG_MIN_LEVEL: "debug" }).LOG_MIN_LEVEL,
+    ).toBe("debug");
+    expect(parseEnv(requiredEnv).LOG_MIN_LEVEL).toBe("info");
+  });
+
   it("PORT と NODE_ENV が未指定なら 3000 と development を既定値にする", () => {
     const env = parseEnv(requiredEnv);
 
