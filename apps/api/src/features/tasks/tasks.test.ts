@@ -44,4 +44,28 @@ describe("POST /projects/:projectId/tasks", () => {
       createdAt: expect.any(String),
     });
   });
+
+  it("description と status を指定すると、その値で保存して返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({
+        title: "Design the top page",
+        description: "Use the new brand colors",
+        status: "in_progress",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      title: "Design the top page",
+      description: "Use the new brand colors",
+      status: "in_progress",
+      createdAt: expect.any(String),
+    });
+  });
 });

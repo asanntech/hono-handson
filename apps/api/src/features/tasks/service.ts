@@ -3,11 +3,11 @@ import { tasks } from "../../db/schema.ts";
 
 export const createTask = async (
   projectId: string,
-  input: { title: string },
+  input: Pick<typeof tasks.$inferInsert, "title" | "description" | "status">,
 ) => {
   const [task] = await db
     .insert(tasks)
-    .values({ projectId, title: input.title })
+    .values({ projectId, ...input })
     .returning({
       id: tasks.id,
       title: tasks.title,
