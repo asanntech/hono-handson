@@ -41,4 +41,15 @@ describe("トランザクション名", () => {
 
     expect(setTransactionName).toHaveBeenCalledWith("GET /health");
   });
+
+  // パスごとに名前が増えると、存在しない URL を大量に叩かれただけで New Relic のトランザクションの一覧が埋まる
+  it("存在しないパスへのリクエストは、パスによらず同じトランザクション名にまとめる", async () => {
+    const setTransactionName = vi.spyOn(newrelic, "setTransactionName");
+
+    await app.request("/no-such-path");
+    await app.request("/another/missing/path");
+
+    expect(setTransactionName).toHaveBeenNthCalledWith(1, "GET /*");
+    expect(setTransactionName).toHaveBeenNthCalledWith(2, "GET /*");
+  });
 });
