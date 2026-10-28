@@ -1,4 +1,5 @@
 import { and, desc, eq, lt, or } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 import { db } from "../../db/client.ts";
 import { type taskStatus, tasks } from "../../db/schema.ts";
 
@@ -84,6 +85,9 @@ export const findTask = async (id: string) => {
     .select(taskColumns)
     .from(tasks)
     .where(eq(tasks.id, id));
+  if (!task) {
+    throw new HTTPException(404);
+  }
   return task;
 };
 
@@ -94,4 +98,8 @@ export const updateTask = async (id: string, input: Partial<TaskInput>) => {
     .where(eq(tasks.id, id))
     .returning(taskColumns);
   return task;
+};
+
+export const deleteTask = async (id: string) => {
+  await db.delete(tasks).where(eq(tasks.id, id));
 };

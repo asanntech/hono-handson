@@ -300,3 +300,29 @@ describe("PATCH /projects/:projectId/tasks/:taskId", () => {
     expect(await getRes.json()).toEqual(updated);
   });
 });
+
+describe("DELETE /projects/:projectId/tasks/:taskId", () => {
+  it("メンバーが呼ぶと 204 を返し、以後そのタスクは 404 になる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { method: "DELETE", headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(204);
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(getRes.status).toBe(404);
+    expect(await getRes.json()).toEqual({ error: { message: "Not Found" } });
+  });
+});

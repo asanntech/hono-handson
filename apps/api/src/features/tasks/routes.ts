@@ -3,7 +3,13 @@ import { z } from "zod";
 import { taskStatus } from "../../db/schema.ts";
 import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createTask, findTask, listTasks, updateTask } from "./service.ts";
+import {
+  createTask,
+  deleteTask,
+  findTask,
+  listTasks,
+  updateTask,
+} from "./service.ts";
 
 const createTaskSchema = z.object({
   title: z.string(),
@@ -40,4 +46,8 @@ export const tasks = new Hono()
   .patch("/:taskId", validator("json", updateTaskSchema), async (c) => {
     const task = await updateTask(c.req.param("taskId"), c.req.valid("json"));
     return c.json(task, 200);
+  })
+  .delete("/:taskId", async (c) => {
+    await deleteTask(c.req.param("taskId"));
+    return c.body(null, 204);
   });
