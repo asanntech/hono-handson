@@ -401,6 +401,56 @@ describe("/projects/:projectId/tasks/:taskId/comments/:commentId で見つから
   );
 });
 
+describe("body の検証", () => {
+  const methods = [
+    { method: "POST", path: "" },
+    { method: "PATCH", path: "/:commentId" },
+  ];
+  const bodies = [
+    { case: "body がない", body: {} },
+    { case: "body が空", body: { body: "" } },
+    { case: "body が空白だけ", body: { body: " \n " } },
+    { case: "body が 2001 文字", body: { body: "a".repeat(2001) } },
+  ];
+
+  it.each(
+    methods.flatMap((method) => bodies.map((body) => ({ ...method, ...body }))),
+  )(
+    "$method で$case なら 400 を返し、コメントを作らず変えない",
+    async ({ method, path, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const task = await createTaskAs(alice, project.id, "Design the top page");
+      const createRes = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: JSON.stringify({ body: "Looks good to me" }),
+        },
+      );
+      const created = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments${path.replace(":commentId", created.id)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+      expect(
+        await db
+          .select({ id: comments.id, body: comments.body })
+          .from(comments),
+      ).toEqual([{ id: created.id, body: "Looks good to me" }]);
+    },
+  );
+});
+
 describe("タスクとプロジェクトの削除", () => {
   it.each([
     {

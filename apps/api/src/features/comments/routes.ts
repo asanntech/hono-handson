@@ -14,8 +14,9 @@ import {
 } from "./service.ts";
 
 const commentSchema = z.object({
-  // 前後の空白や改行は、入力のときに紛れ込んだもので意味を持たないため落とす
-  body: z.string().trim(),
+  // 前後の空白や改行は、入力のときに紛れ込んだもので意味を持たないため落とす。
+  // trim を先に置くと、空白を落とした後の文字数で min / max を判定する。空白だけの body は空文字になり弾かれる
+  body: z.string().trim().min(1).max(2000),
 });
 
 // requireMember の後に置き、パスの :taskId がそのプロジェクトのタスクでなければ 404 にする。
