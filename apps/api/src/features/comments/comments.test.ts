@@ -26,6 +26,19 @@ const createProjectAs = async (user: { cookie: string }, name: string) => {
   return (await res.json()) as { id: string; name: string };
 };
 
+// owner としてプロジェクトに、email のユーザーをメンバーとして招待する
+const inviteAs = async (
+  owner: { cookie: string },
+  projectId: string,
+  email: string,
+) => {
+  await app.request(`/projects/${projectId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: owner.cookie },
+    body: JSON.stringify({ email }),
+  });
+};
+
 // user としてプロジェクトにタスクを作り、作ったタスクの { id } を返す
 const createTaskAs = async (
   user: { cookie: string },
@@ -231,4 +244,54 @@ describe("タスクとプロジェクトの削除", () => {
     expect(res.status).toBe(204);
     expect(await db.select().from(comments)).toEqual([]);
   });
+});
+
+describe("コメントを書いた本人でないメンバー", () => {
+  it.each([
+    { method: "PATCH", body: { body: "Hijacked" } },
+    { method: "DELETE" },
+  ])(
+    "$method すると、プロジェクトの owner でも別のメンバーでも 403 を返し、コメントを変えない",
+    async ({ method, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const carol = await signupAs("carol@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      await inviteAs(alice, project.id, "bob@example.com");
+      await inviteAs(alice, project.id, "carol@example.com");
+      const task = await createTaskAs(alice, project.id, "Design the top page");
+      const createRes = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+          body: JSON.stringify({ body: "Looks good to me" }),
+        },
+      );
+      const created = await createRes.json();
+
+      // alice はプロジェクトの owner、carol は bob と同じただのメンバー
+      for (const other of [alice, carol]) {
+        const res = await app.request(
+          `/projects/${project.id}/tasks/${task.id}/comments/${created.id}`,
+          {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: other.cookie,
+            },
+            body: body && JSON.stringify(body),
+          },
+        );
+
+        expect(res.status).toBe(403);
+        expect(await res.json()).toEqual({ error: { message: "Forbidden" } });
+      }
+      const listRes = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments`,
+        { headers: { Cookie: bob.cookie } },
+      );
+      expect(await listRes.json()).toEqual([created]);
+    },
+  );
 });

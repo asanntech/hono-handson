@@ -52,11 +52,12 @@ export const comments = new Hono<{ Variables: MemberVariables }>()
   .patch("/:commentId", validator("json", commentSchema), async (c) => {
     const comment = await updateComment(
       c.req.param("commentId"),
+      c.get("userId"),
       c.req.valid("json"),
     );
     return c.json(comment, 200);
   })
   .delete("/:commentId", async (c) => {
-    await deleteComment(c.req.param("commentId"));
+    await deleteComment(c.req.param("commentId"), c.get("userId"));
     return c.body(null, 204);
   });
