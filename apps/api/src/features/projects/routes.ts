@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.ts";
 import { requireMember, requireOwner } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
+import { tasks } from "../tasks/routes.ts";
 import {
   addMember,
   createProject,
@@ -84,4 +85,5 @@ export const projects = new Hono()
     }
     await removeMember(c.req.param("projectId"), userId.data);
     return c.body(null, 204);
-  });
+  })
+  .route("/:projectId/tasks", tasks);

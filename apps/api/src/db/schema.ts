@@ -44,3 +44,22 @@ export const projectMembers = pgTable(
   },
   (table) => [primaryKey({ columns: [table.projectId, table.userId] })],
 );
+
+export const taskStatus = pgEnum("task_status", [
+  "todo",
+  "in_progress",
+  "done",
+]);
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  status: taskStatus("status").notNull().default("todo"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

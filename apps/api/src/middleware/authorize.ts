@@ -5,9 +5,12 @@ import type { projectRole } from "../db/schema.ts";
 import { findMemberRole } from "../features/projects/service.ts";
 import type { AuthVariables } from "./auth.ts";
 
-// 後続のミドルウェアとハンドラが c.get("role") で、ログイン中のユーザーのプロジェクト内での役割を受け取る
+// 後続のミドルウェアとハンドラが c.get("role") で、ログイン中のユーザーのプロジェクト内での役割を受け取る。
+// c.get("projectId") では、UUID と確かめ済みのプロジェクト ID を受け取る。子アプリ（tasks など）ではパスの型に
+// :projectId が含まれず、c.req.param("projectId") が string | undefined になるため
 export type MemberVariables = AuthVariables & {
   role: (typeof projectRole.enumValues)[number];
+  projectId: string;
 };
 
 // requireAuth の後に置き、パスの :projectId のメンバーでなければ 404 にする。
@@ -25,6 +28,7 @@ export const requireMember = createMiddleware<{ Variables: MemberVariables }>(
       throw new HTTPException(404);
     }
     c.set("role", role);
+    c.set("projectId", projectId.data);
     await next();
   },
 );

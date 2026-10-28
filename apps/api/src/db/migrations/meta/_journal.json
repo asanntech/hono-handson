@@ -36,6 +36,13 @@
       "when": 1793081400692,
       "tag": "0004_cascade_project_members_on_project_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793149456979,
+      "tag": "0005_create_tasks",
+      "breakpoints": true
     }
   ]
 }
