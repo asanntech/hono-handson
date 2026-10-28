@@ -43,6 +43,13 @@
       "when": 1793153687257,
       "tag": "0005_create_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793172495765,
+      "tag": "0006_add_tasks_list_index",
+      "breakpoints": true
     }
   ]
 }
