@@ -84,6 +84,18 @@ describe("parseEnv", () => {
     },
   );
 
+  // ブラウザが送る Origin ヘッダーはパスも末尾のスラッシュも持たないため、それらを含む値は一致せず、すべて拒否されてしまう
+  it.each([
+    "",
+    "not-a-url",
+    "localhost:5173",
+    "ftp://localhost:5173",
+    "http://localhost:5173/",
+    "http://localhost:5173/app",
+  ])("WEB_ORIGIN が %j なら検証エラーを投げる", (origin) => {
+    expect(() => parseEnv({ ...requiredEnv, WEB_ORIGIN: origin })).toThrow();
+  });
+
   it.each([undefined, "a".repeat(31)])(
     "JWT_SECRET が %j なら検証エラーを投げる",
     (secret) => {

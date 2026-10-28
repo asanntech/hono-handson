@@ -7,7 +7,11 @@ const envSchema = z.object({
     .default("development"),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   JWT_SECRET: z.string().min(32),
-  WEB_ORIGIN: z.string().default("http://localhost:5173"),
+  // ブラウザが送る Origin ヘッダーと文字列で比べるため、パスや末尾のスラッシュを含まないオリジンの形に限る
+  WEB_ORIGIN: z
+    .url({ protocol: /^https?$/ })
+    .refine((url) => url === new URL(url).origin)
+    .default("http://localhost:5173"),
 });
 
 export const parseEnv = (source: Record<string, string | undefined>) =>
