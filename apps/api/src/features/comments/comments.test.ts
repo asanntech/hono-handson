@@ -61,6 +61,34 @@ describe("POST /projects/:projectId/tasks/:taskId/comments", () => {
       createdAt: expect.any(String),
     });
   });
+
+  it("body の前後の空白を落として保存し、2000 文字の body も受け付ける", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const task = await createTaskAs(alice, project.id, "Design the top page");
+
+    const trimmedRes = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body: "  Looks good to me\n" }),
+      },
+    );
+    const longRes = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body: "a".repeat(2000) }),
+      },
+    );
+
+    expect(trimmedRes.status).toBe(201);
+    expect((await trimmedRes.json()).body).toBe("Looks good to me");
+    expect(longRes.status).toBe(201);
+    expect((await longRes.json()).body).toBe("a".repeat(2000));
+  });
 });
 
 describe("GET /projects/:projectId/tasks/:taskId/comments", () => {

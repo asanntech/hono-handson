@@ -12,7 +12,8 @@ import {
 } from "./service.ts";
 
 const commentSchema = z.object({
-  body: z.string(),
+  // 前後の空白や改行は、入力のときに紛れ込んだもので意味を持たないため落とす
+  body: z.string().trim(),
 });
 
 // :taskId は親の tasks のパスにあり、このアプリのパスの型には含まれない。
