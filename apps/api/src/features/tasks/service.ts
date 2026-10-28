@@ -92,26 +92,43 @@ export const listTasks = async (
   return { items, nextCursor: encodeCursor(items[items.length - 1]) };
 };
 
-export const findTask = async (id: string) => {
+// パスの projectId でも絞り込む。別のプロジェクトのタスク ID を指定されても、存在しない ID と同じ 404 にする
+const byProjectAndId = (projectId: string, id: string) =>
+  and(eq(tasks.projectId, projectId), eq(tasks.id, id));
+
+export const findTask = async (projectId: string, id: string) => {
   const [task] = await db
     .select(taskColumns)
     .from(tasks)
-    .where(eq(tasks.id, id));
+    .where(byProjectAndId(projectId, id));
   if (!task) {
     throw new HTTPException(404);
   }
   return task;
 };
 
-export const updateTask = async (id: string, input: Partial<TaskInput>) => {
+export const updateTask = async (
+  projectId: string,
+  id: string,
+  input: Partial<TaskInput>,
+) => {
   const [task] = await db
     .update(tasks)
     .set(input)
-    .where(eq(tasks.id, id))
+    .where(byProjectAndId(projectId, id))
     .returning(taskColumns);
+  if (!task) {
+    throw new HTTPException(404);
+  }
   return task;
 };
 
-export const deleteTask = async (id: string) => {
-  await db.delete(tasks).where(eq(tasks.id, id));
+export const deleteTask = async (projectId: string, id: string) => {
+  const deleted = await db
+    .delete(tasks)
+    .where(byProjectAndId(projectId, id))
+    .returning({ id: tasks.id });
+  if (deleted.length === 0) {
+    throw new HTTPException(404);
+  }
 };

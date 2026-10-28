@@ -47,6 +47,18 @@ const listTasksQueryValidator = zValidator(
   },
 );
 
+// tasks.id は uuid 型。UUID でない値のまま問い合わせると、DB の型エラーで 500 になる。
+// UUID の形でない ID が指すタスクはないので、400 ではなく見つからないとして扱う
+const taskParamValidator = zValidator(
+  "param",
+  z.object({ taskId: z.uuid() }),
+  (result) => {
+    if (!result.success) {
+      throw new HTTPException(404);
+    }
+  },
+);
+
 // projects のルートから /projects/:projectId/tasks につなぐ。ログインの確認は projects 側の requireAuth が行う。
 // tasks の操作はどれもメンバーなら行えるので、ルートごとではなく先頭でまとめて requireMember を掛ける
 export const tasks = new Hono()
@@ -59,15 +71,27 @@ export const tasks = new Hono()
     const page = await listTasks(c.get("projectId"), c.req.valid("query"));
     return c.json(page, 200);
   })
-  .get("/:taskId", async (c) => {
-    const task = await findTask(c.req.param("taskId"));
+  .get("/:taskId", taskParamValidator, async (c) => {
+    const task = await findTask(
+      c.get("projectId"),
+      c.req.valid("param").taskId,
+    );
     return c.json(task, 200);
   })
-  .patch("/:taskId", validator("json", updateTaskSchema), async (c) => {
-    const task = await updateTask(c.req.param("taskId"), c.req.valid("json"));
-    return c.json(task, 200);
-  })
-  .delete("/:taskId", async (c) => {
-    await deleteTask(c.req.param("taskId"));
+  .patch(
+    "/:taskId",
+    taskParamValidator,
+    validator("json", updateTaskSchema),
+    async (c) => {
+      const task = await updateTask(
+        c.get("projectId"),
+        c.req.valid("param").taskId,
+        c.req.valid("json"),
+      );
+      return c.json(task, 200);
+    },
+  )
+  .delete("/:taskId", taskParamValidator, async (c) => {
+    await deleteTask(c.get("projectId"), c.req.valid("param").taskId);
     return c.body(null, 204);
   });

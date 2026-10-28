@@ -569,6 +569,64 @@ describe("DELETE /projects/:projectId/tasks/:taskId", () => {
   });
 });
 
+describe("/projects/:projectId/tasks/:taskId で見つからないタスク", () => {
+  const methods = [
+    { method: "GET" },
+    { method: "PATCH", body: { title: "Hijacked" } },
+    { method: "DELETE" },
+  ];
+  // 呼ぶ人は両方のプロジェクトのメンバー。別のプロジェクトのタスクは、パスのプロジェクトからは見えないものとして扱う
+  const taskIds = [
+    {
+      case: "別のプロジェクトのタスク ID",
+      taskIdOf: (otherProjectTask: { id: string }) => otherProjectTask.id,
+    },
+    {
+      case: "存在しない ID",
+      taskIdOf: () => "00000000-0000-4000-8000-000000000000",
+    },
+    { case: "UUID の形でない ID", taskIdOf: () => "not-a-uuid" },
+  ];
+
+  it.each(
+    methods.flatMap((method) => taskIds.map((id) => ({ ...method, ...id }))),
+  )(
+    "$method で$case を指定すると 404 を返し、タスクを変えない",
+    async ({ method, body, taskIdOf }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const otherProject = await createProjectAs(alice, "Mobile App");
+      const createRes = await app.request(
+        `/projects/${otherProject.id}/tasks`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: alice.cookie,
+          },
+          body: JSON.stringify({ title: "Design the top page" }),
+        },
+      );
+      const otherProjectTask = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${taskIdOf(otherProjectTask)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db.select({ id: tasks.id, title: tasks.title }).from(tasks),
+      ).toEqual([{ id: otherProjectTask.id, title: "Design the top page" }]);
+    },
+  );
+});
+
 describe("プロジェクトの削除", () => {
   it("プロジェクトを削除すると、そのプロジェクトのタスクも消える", async () => {
     const alice = await signupAs("alice@example.com");
