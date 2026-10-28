@@ -10,6 +10,7 @@ import { health } from "./features/health/routes.ts";
 import { projects } from "./features/projects/routes.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.ts";
 import { requestLogger } from "./middleware/request-logger.ts";
+import { newrelicTransaction } from "./newrelic/middleware.ts";
 
 export const app = new Hono()
   // ログと New Relic でリクエストを追えるよう、最初にリクエストIDを振り、X-Request-Id ヘッダーで返す。
@@ -18,6 +19,7 @@ export const app = new Hono()
   .use(requestId())
   // 後続のミドルウェアが途中で返したレスポンス（CORS のプリフライトや CSRF での拒否など）も記録するため、先頭近くに置く
   .use(requestLogger)
+  .use(newrelicTransaction)
   // 全レスポンスに、MIME スニッフィングや iframe への埋め込みを禁じるヘッダーを付ける
   .use(secureHeaders())
   // プリフライトは Cookie を付けずに来るため、認証より前で応答する。Cookie を送れるよう credentials を許可する

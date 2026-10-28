@@ -18,6 +18,10 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       JWT_SECRET: "test-jwt-secret-at-least-32-characters",
       LOG_MIN_LEVEL: "silent",
+      // テストではエージェントを無効にし、New Relic にデータを送らない。API の呼び出しは vi.spyOn で検証する
+      NEW_RELIC_ENABLED: "false",
+      // 無効にしてもエージェント自身のログ（newrelic_agent.log）は書かれるため、それも止める
+      NEW_RELIC_LOG_ENABLED: "false",
     },
     globalSetup: ["./src/test/global-setup.ts"],
     setupFiles: ["./src/test/setup.ts"],
