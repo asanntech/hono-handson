@@ -3,7 +3,7 @@ import { z } from "zod";
 import { taskStatus } from "../../db/schema.ts";
 import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createTask, listTasks } from "./service.ts";
+import { createTask, findTask, listTasks } from "./service.ts";
 
 const createTaskSchema = z.object({
   title: z.string(),
@@ -29,4 +29,8 @@ export const tasks = new Hono()
   .get("/", validator("query", listTasksQuerySchema), async (c) => {
     const page = await listTasks(c.get("projectId"), c.req.valid("query"));
     return c.json(page, 200);
+  })
+  .get("/:taskId", async (c) => {
+    const task = await findTask(c.req.param("taskId"));
+    return c.json(task, 200);
   });

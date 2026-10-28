@@ -75,3 +75,11 @@ export const listTasks = async (
   const items = rows.slice(0, query.limit);
   return { items, nextCursor: encodeCursor(items[items.length - 1]) };
 };
+
+export const findTask = async (id: string) => {
+  const [task] = await db
+    .select(taskColumns)
+    .from(tasks)
+    .where(eq(tasks.id, id));
+  return task;
+};
