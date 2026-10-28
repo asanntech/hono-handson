@@ -7,6 +7,7 @@ import { app } from "../../app.ts";
 import { db } from "../../db/client.ts";
 import { users } from "../../db/schema.ts";
 import { env } from "../../env.ts";
+import { connectionFrom } from "../../test/connection.ts";
 
 describe("POST /auth/signup", () => {
   it("正しいメールとパスワードなら 201 と { id, email } を返し、パスワードをハッシュ化して保存する", async () => {
@@ -149,7 +150,6 @@ describe("POST /auth/login", () => {
     });
     const { id } = await signupRes.json();
 
-    // login はレート制限のために接続元の IP を読む。第 3 引数（c.env）で接続元を渡す
     const res = await app.request(
       "/auth/login",
       {
@@ -160,7 +160,7 @@ describe("POST /auth/login", () => {
           password: "password123",
         }),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+      connectionFrom("192.0.2.1"),
     );
 
     expect(res.status).toBe(200);
@@ -210,7 +210,7 @@ describe("POST /auth/login", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
-        { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+        connectionFrom("192.0.2.1"),
       );
 
       expect(res.status).toBe(401);
@@ -240,7 +240,7 @@ describe("POST /auth/login", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+      connectionFrom("192.0.2.1"),
     );
 
     expect(res.status).toBe(400);
@@ -256,7 +256,7 @@ describe("POST /auth/login", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: "alice@example.com", password: "short" }),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+      connectionFrom("192.0.2.1"),
     );
 
     expect(res.status).toBe(401);
@@ -273,8 +273,7 @@ describe("POST /auth/login のレート制限", () => {
         password: "password123",
       }),
     });
-    // app.request の第 3 引数は、@hono/node-server がハンドラに渡す c.env。接続元の IP はここから読む
-    const connection = { incoming: { socket: { remoteAddress: "192.0.2.1" } } };
+    const connection = connectionFrom("192.0.2.1");
 
     for (let i = 0; i < 5; i++) {
       const res = await app.request(
@@ -326,7 +325,7 @@ describe("POST /auth/login のレート制限", () => {
         password: "password123",
       }),
     });
-    const attacker = { incoming: { socket: { remoteAddress: "192.0.2.1" } } };
+    const attacker = connectionFrom("192.0.2.1");
     for (let i = 0; i < 6; i++) {
       await app.request(
         "/auth/login",
@@ -352,7 +351,7 @@ describe("POST /auth/login のレート制限", () => {
           password: "password123",
         }),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.2" } } },
+      connectionFrom("192.0.2.2"),
     );
 
     expect(res.status).toBe(200);

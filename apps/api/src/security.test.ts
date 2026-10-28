@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { app } from "./app.ts";
 import { env } from "./env.ts";
+import { connectionFrom } from "./test/connection.ts";
 
 describe("セキュリティヘッダー", () => {
   // 正常なレスポンスだけでなく、notFound や onError が返すレスポンスにも付くことを確かめる
@@ -106,7 +107,7 @@ describe("リクエストボディの上限", () => {
         headers: { "Content-Type": "application/json" },
         body: "a".repeat(100 * 1024),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+      connectionFrom("192.0.2.1"),
     );
 
     // 本文を最後まで読んだうえで JSON として不正なので、バリデーターが 400 を返す
@@ -121,7 +122,7 @@ describe("リクエストボディの上限", () => {
         headers: { "Content-Type": "application/json" },
         body: "a".repeat(100 * 1024 + 1),
       },
-      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+      connectionFrom("192.0.2.1"),
     );
 
     expect(res.status).toBe(413);
