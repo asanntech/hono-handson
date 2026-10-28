@@ -34,4 +34,18 @@ describe("CORS", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(env.WEB_ORIGIN);
     expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
   });
+
+  // 許可するオリジンを * やリクエストの Origin の反射に緩めると、どのサイトの JS からも Cookie 付きでレスポンスを読めてしまう
+  it("WEB_ORIGIN 以外のオリジンには Access-Control-Allow-Origin を返さない", async () => {
+    const res = await app.request("/projects", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://evil.example",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type",
+      },
+    });
+
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
 });
