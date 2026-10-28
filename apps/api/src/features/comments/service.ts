@@ -29,3 +29,12 @@ export const listComments = async (taskId: string) =>
     .where(eq(comments.taskId, taskId))
     // 作成日時が同じコメントの順番も決まるよう、id を 2 つ目の並び順にする
     .orderBy(asc(comments.createdAt), asc(comments.id));
+
+export const updateComment = async (id: string, input: { body: string }) => {
+  const [comment] = await db
+    .update(comments)
+    .set(input)
+    .where(eq(comments.id, id))
+    .returning(commentColumns);
+  return comment;
+};

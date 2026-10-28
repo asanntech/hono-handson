@@ -103,3 +103,42 @@ describe("GET /projects/:projectId/tasks/:taskId/comments", () => {
     ]);
   });
 });
+
+describe("PATCH /projects/:projectId/tasks/:taskId/comments/:commentId", () => {
+  it("書いた本人が body を送ると、更新して 200 と更新後のコメントを返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const task = await createTaskAs(alice, project.id, "Design the top page");
+    const createRes = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body: "Looks good to me" }),
+      },
+    );
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body: "Looks good, but fix the header" }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ...created,
+      body: "Looks good, but fix the header",
+    });
+    const listRes = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(await listRes.json()).toEqual([
+      { ...created, body: "Looks good, but fix the header" },
+    ]);
+  });
+});

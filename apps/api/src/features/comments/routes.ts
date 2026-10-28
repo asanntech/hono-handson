@@ -4,9 +4,9 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { MemberVariables } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createComment, listComments } from "./service.ts";
+import { createComment, listComments, updateComment } from "./service.ts";
 
-const createCommentSchema = z.object({
+const commentSchema = z.object({
   body: z.string(),
 });
 
@@ -29,7 +29,7 @@ export const comments = new Hono<{ Variables: MemberVariables }>()
   .post(
     "/",
     taskParamValidator,
-    validator("json", createCommentSchema),
+    validator("json", commentSchema),
     async (c) => {
       const comment = await createComment(
         c.req.valid("param").taskId,
@@ -42,4 +42,11 @@ export const comments = new Hono<{ Variables: MemberVariables }>()
   .get("/", taskParamValidator, async (c) => {
     const taskComments = await listComments(c.req.valid("param").taskId);
     return c.json(taskComments, 200);
+  })
+  .patch("/:commentId", validator("json", commentSchema), async (c) => {
+    const comment = await updateComment(
+      c.req.param("commentId"),
+      c.req.valid("json"),
+    );
+    return c.json(comment, 200);
   });
