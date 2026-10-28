@@ -11,6 +11,12 @@ const createTaskSchema = z.object({
   status: z.enum(taskStatus.enumValues).optional(),
 });
 
+const listTasksQuerySchema = z.object({
+  // クエリパラメータは文字列で届くため、coerce で数値に変換してから検証する
+  limit: z.coerce.number().default(20),
+  cursor: z.string().optional(),
+});
+
 // projects のルートから /projects/:projectId/tasks につなぐ。ログインの確認は projects 側の requireAuth が行う。
 // tasks の操作はどれもメンバーなら行えるので、ルートごとではなく先頭でまとめて requireMember を掛ける
 export const tasks = new Hono()
@@ -19,7 +25,7 @@ export const tasks = new Hono()
     const task = await createTask(c.get("projectId"), c.req.valid("json"));
     return c.json(task, 201);
   })
-  .get("/", async (c) => {
-    const page = await listTasks(c.get("projectId"));
+  .get("/", validator("query", listTasksQuerySchema), async (c) => {
+    const page = await listTasks(c.get("projectId"), c.req.valid("query"));
     return c.json(page, 200);
   });

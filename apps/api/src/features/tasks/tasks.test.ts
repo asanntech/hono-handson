@@ -121,4 +121,50 @@ describe("GET /projects/:projectId/tasks", () => {
       nextCursor: null,
     });
   });
+
+  it("limit を指定すると limit 件と nextCursor を返し、nextCursor で続きを取得でき、最後のページでは nextCursor が null になる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Task 1",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Task 2",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Task 3",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(firstRes.status).toBe(200);
+    const firstPage = await firstRes.json();
+    expect(
+      firstPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Task 3", "Task 2"]);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(secondRes.status).toBe(200);
+    const secondPage = await secondRes.json();
+    expect(
+      secondPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Task 1"]);
+    expect(secondPage.nextCursor).toBeNull();
+  });
 });

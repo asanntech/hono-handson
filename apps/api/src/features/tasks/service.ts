@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "../../db/client.ts";
 import { tasks } from "../../db/schema.ts";
 
@@ -9,6 +9,25 @@ const taskColumns = {
   description: tasks.description,
   status: tasks.status,
   createdAt: tasks.createdAt,
+};
+
+// カーソルは、前のページの最後のタスクの { createdAt, id }。
+// クライアントには中身を意識させないよう、JSON を base64url で包んだ文字列にする
+type Cursor = { createdAt: Date; id: string };
+
+const encodeCursor = (cursor: Cursor) =>
+  Buffer.from(
+    JSON.stringify({
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id,
+    }),
+  ).toString("base64url");
+
+const decodeCursor = (value: string): Cursor => {
+  const { createdAt, id } = JSON.parse(
+    Buffer.from(value, "base64url").toString(),
+  );
+  return { createdAt: new Date(createdAt), id };
 };
 
 export const createTask = async (
@@ -22,12 +41,32 @@ export const createTask = async (
   return task;
 };
 
-export const listTasks = async (projectId: string) => {
-  const items = await db
+export const listTasks = async (
+  projectId: string,
+  query: { limit: number; cursor?: string },
+) => {
+  const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
+  const rows = await db
     .select(taskColumns)
     .from(tasks)
-    .where(eq(tasks.projectId, projectId))
+    .where(
+      and(
+        eq(tasks.projectId, projectId),
+        // 並び順（createdAt の降順、同じなら id の降順）で、カーソルより後ろにあるタスクだけを取る
+        cursor &&
+          or(
+            lt(tasks.createdAt, cursor.createdAt),
+            and(eq(tasks.createdAt, cursor.createdAt), lt(tasks.id, cursor.id)),
+          ),
+      ),
+    )
     // 作成日時が同じタスクの順番も決まるよう、id を 2 つ目の並び順にする
-    .orderBy(desc(tasks.createdAt), desc(tasks.id));
-  return { items, nextCursor: null };
+    .orderBy(desc(tasks.createdAt), desc(tasks.id))
+    // 次のページがあるかを知るため、1 件多く取る
+    .limit(query.limit + 1);
+  if (rows.length <= query.limit) {
+    return { items: rows, nextCursor: null };
+  }
+  const items = rows.slice(0, query.limit);
+  return { items, nextCursor: encodeCursor(items[items.length - 1]) };
 };
