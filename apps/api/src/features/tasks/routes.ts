@@ -12,8 +12,9 @@ import {
 } from "./service.ts";
 
 const createTaskSchema = z.object({
-  title: z.string().trim(),
-  description: z.string().optional(),
+  // trim を先に置くと、空白を落とした後の文字数で min / max を判定する。空白だけの title は空文字になり弾かれる
+  title: z.string().trim().min(1).max(200),
+  description: z.string().max(2000).optional(),
   status: z.enum(taskStatus.enumValues).optional(),
 });
 

@@ -155,6 +155,33 @@ describe("POST /projects/:projectId/tasks", () => {
     expect(longRes.status).toBe(201);
     expect((await longRes.json()).title).toBe("a".repeat(200));
   });
+
+  it.each([
+    { case: "title が空", body: { title: "" } },
+    { case: "title が空白だけ", body: { title: "   " } },
+    { case: "title が 201 文字", body: { title: "a".repeat(201) } },
+    {
+      case: "description が 2001 文字",
+      body: { title: "Design", description: "a".repeat(2001) },
+    },
+    {
+      case: "status が不正な値",
+      body: { title: "Design", status: "archived" },
+    },
+  ])("$case なら 400 を返し、タスクを作らない", async ({ body }) => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
+    expect(await db.select().from(tasks)).toEqual([]);
+  });
 });
 
 describe("GET /projects/:projectId/tasks", () => {
