@@ -59,7 +59,11 @@ describe("/projects 配下の認証", () => {
   ])(
     "Cookie を付けずに $method $path を呼ぶと 401 を返す",
     async ({ method, path }) => {
-      const res = await app.request(path, { method });
+      // ブラウザは変更系のリクエストに必ず Origin を付ける。付けないと、本文の無いリクエストは CSRF 対策で 403 になる
+      const res = await app.request(path, {
+        method,
+        headers: { Origin: "http://localhost" },
+      });
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
@@ -340,7 +344,7 @@ describe("DELETE /projects/:projectId", () => {
 
     const res = await app.request(`/projects/${project.id}`, {
       method: "DELETE",
-      headers: { Cookie: alice.cookie },
+      headers: { Origin: "http://localhost", Cookie: alice.cookie },
     });
 
     expect(res.status).toBe(204);
@@ -420,7 +424,10 @@ describe("owner だけができる操作", () => {
 
     const res = await app.request(
       `/projects/${project.id}/members/${carol.id}`,
-      { method: "DELETE", headers: { Cookie: bob.cookie } },
+      {
+        method: "DELETE",
+        headers: { Origin: "http://localhost", Cookie: bob.cookie },
+      },
     );
 
     expect(res.status).toBe(403);
@@ -511,7 +518,7 @@ describe("メンバーでないユーザー", () => {
 
     const res = await app.request(`/projects/${project.id}/members/${bob.id}`, {
       method: "DELETE",
-      headers: { Cookie: dave.cookie },
+      headers: { Origin: "http://localhost", Cookie: dave.cookie },
     });
 
     expect(res.status).toBe(404);
@@ -632,7 +639,7 @@ describe("DELETE /projects/:projectId/members/:userId", () => {
 
     const res = await app.request(`/projects/${project.id}/members/${bob.id}`, {
       method: "DELETE",
-      headers: { Cookie: alice.cookie },
+      headers: { Origin: "http://localhost", Cookie: alice.cookie },
     });
 
     expect(res.status).toBe(204);
@@ -655,7 +662,10 @@ describe("DELETE /projects/:projectId/members/:userId", () => {
 
     const res = await app.request(
       `/projects/${project.id}/members/${alice.id}`,
-      { method: "DELETE", headers: { Cookie: alice.cookie } },
+      {
+        method: "DELETE",
+        headers: { Origin: "http://localhost", Cookie: alice.cookie },
+      },
     );
 
     // owner がいなくなると、プロジェクトの更新・削除・招待を誰もできなくなる
@@ -688,7 +698,10 @@ describe("DELETE /projects/:projectId/members/:userId", () => {
 
       const res = await app.request(
         `/projects/${project.id}/members/${userId}`,
-        { method: "DELETE", headers: { Cookie: alice.cookie } },
+        {
+          method: "DELETE",
+          headers: { Origin: "http://localhost", Cookie: alice.cookie },
+        },
       );
 
       expect(res.status).toBe(404);

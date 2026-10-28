@@ -67,7 +67,11 @@ describe("/projects/:projectId/tasks/:taskId/comments 配下の認証", () => {
   ])(
     "Cookie を付けずに $method $path を呼ぶと 401 を返す",
     async ({ method, path }) => {
-      const res = await app.request(path, { method });
+      // ブラウザは変更系のリクエストに必ず Origin を付ける。付けないと、本文の無いリクエストは CSRF 対策で 403 になる
+      const res = await app.request(path, {
+        method,
+        headers: { Origin: "http://localhost" },
+      });
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
@@ -268,7 +272,10 @@ describe("DELETE /projects/:projectId/tasks/:taskId/comments/:commentId", () => 
 
     const res = await app.request(
       `/projects/${project.id}/tasks/${task.id}/comments/${created.id}`,
-      { method: "DELETE", headers: { Cookie: alice.cookie } },
+      {
+        method: "DELETE",
+        headers: { Origin: "http://localhost", Cookie: alice.cookie },
+      },
     );
 
     expect(res.status).toBe(204);
@@ -474,7 +481,7 @@ describe("タスクとプロジェクトの削除", () => {
 
     const res = await app.request(pathOf(project.id, task.id), {
       method: "DELETE",
-      headers: { Cookie: alice.cookie },
+      headers: { Origin: "http://localhost", Cookie: alice.cookie },
     });
 
     expect(res.status).toBe(204);

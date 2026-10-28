@@ -7,6 +7,7 @@ import { app } from "../../app.ts";
 import { db } from "../../db/client.ts";
 import { users } from "../../db/schema.ts";
 import { env } from "../../env.ts";
+import { connectionFrom } from "../../test/connection.ts";
 
 describe("POST /auth/signup", () => {
   it("正しいメールとパスワードなら 201 と { id, email } を返し、パスワードをハッシュ化して保存する", async () => {
@@ -149,14 +150,18 @@ describe("POST /auth/login", () => {
     });
     const { id } = await signupRes.json();
 
-    const res = await app.request("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      },
+      connectionFrom("192.0.2.1"),
+    );
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id, email: "alice@example.com" });
@@ -198,11 +203,15 @@ describe("POST /auth/login", () => {
         }),
       });
 
-      const res = await app.request("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await app.request(
+        "/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        connectionFrom("192.0.2.1"),
+      );
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({
@@ -224,11 +233,15 @@ describe("POST /auth/login", () => {
     { case: "email がない", body: { password: "password123" } },
     { case: "password がない", body: { email: "alice@example.com" } },
   ])("$case なら 400 と統一形式のエラーを返す", async ({ body }) => {
-    const res = await app.request("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      connectionFrom("192.0.2.1"),
+    );
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: { message: "Bad Request" } });
@@ -236,13 +249,112 @@ describe("POST /auth/login", () => {
 
   // パスワードの長さの規則は signup で課すもの。規則を後から厳しくしても、既存のユーザーが login できなくならないようにする
   it("signup の規則に合わない長さのパスワードでも、400 ではなく 401 を返す", async () => {
-    const res = await app.request("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "alice@example.com", password: "short" }),
-    });
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "alice@example.com", password: "short" }),
+      },
+      connectionFrom("192.0.2.1"),
+    );
 
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /auth/login のレート制限", () => {
+  it("同じ IP からは 15 分に 5 回まで処理し、6 回目は正しいパスワードでも 429 を返してログインさせない", async () => {
+    await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const connection = connectionFrom("192.0.2.1");
+
+    for (let i = 0; i < 5; i++) {
+      const res = await app.request(
+        "/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "alice@example.com",
+            password: "wrong-password",
+          }),
+        },
+        connection,
+      );
+      expect(res.status).toBe(401);
+    }
+
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      },
+      connection,
+    );
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({
+      error: { message: "Too Many Requests" },
+    });
+    expect(res.headers.getSetCookie()).toEqual([]);
+    // いつ再試行できるかを秒で伝える。15 分の枠の残りなので、900 秒以下になる
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    expect(retryAfter).toBeGreaterThan(890);
+    expect(retryAfter).toBeLessThanOrEqual(900);
+  });
+
+  // 回数は IP ごとに数える。攻撃者の IP が制限されても、ほかの利用者はログインできる
+  it("ある IP が制限されていても、別の IP からはログインできる", async () => {
+    await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const attacker = connectionFrom("192.0.2.1");
+    for (let i = 0; i < 6; i++) {
+      await app.request(
+        "/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "alice@example.com",
+            password: "wrong-password",
+          }),
+        },
+        attacker,
+      );
+    }
+
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      },
+      connectionFrom("192.0.2.2"),
+    );
+
+    expect(res.status).toBe(200);
   });
 });
 
@@ -386,7 +498,7 @@ describe("POST /auth/logout", () => {
 
     const res = await app.request("/auth/logout", {
       method: "POST",
-      headers: { Cookie: `token=${cookie.value}` },
+      headers: { Origin: "http://localhost", Cookie: `token=${cookie.value}` },
     });
 
     expect(res.status).toBe(204);
