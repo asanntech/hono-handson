@@ -315,6 +315,48 @@ describe("POST /auth/login のレート制限", () => {
     expect(retryAfter).toBeGreaterThan(890);
     expect(retryAfter).toBeLessThanOrEqual(900);
   });
+
+  // 回数は IP ごとに数える。攻撃者の IP が制限されても、ほかの利用者はログインできる
+  it("ある IP が制限されていても、別の IP からはログインできる", async () => {
+    await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const attacker = { incoming: { socket: { remoteAddress: "192.0.2.1" } } };
+    for (let i = 0; i < 6; i++) {
+      await app.request(
+        "/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "alice@example.com",
+            password: "wrong-password",
+          }),
+        },
+        attacker,
+      );
+    }
+
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@example.com",
+          password: "password123",
+        }),
+      },
+      { incoming: { socket: { remoteAddress: "192.0.2.2" } } },
+    );
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("GET /auth/me", () => {
