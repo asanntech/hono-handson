@@ -3,13 +3,16 @@ import { z } from "zod";
 import { taskStatus } from "../../db/schema.ts";
 import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createTask, findTask, listTasks } from "./service.ts";
+import { createTask, findTask, listTasks, updateTask } from "./service.ts";
 
 const createTaskSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   status: z.enum(taskStatus.enumValues).optional(),
 });
+
+// PATCH は送った項目だけを更新する
+const updateTaskSchema = createTaskSchema.partial();
 
 const listTasksQuerySchema = z.object({
   // クエリパラメータは文字列で届くため、coerce で数値に変換してから検証する
@@ -32,5 +35,9 @@ export const tasks = new Hono()
   })
   .get("/:taskId", async (c) => {
     const task = await findTask(c.req.param("taskId"));
+    return c.json(task, 200);
+  })
+  .patch("/:taskId", validator("json", updateTaskSchema), async (c) => {
+    const task = await updateTask(c.req.param("taskId"), c.req.valid("json"));
     return c.json(task, 200);
   });

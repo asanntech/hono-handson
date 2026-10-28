@@ -30,10 +30,13 @@ const decodeCursor = (value: string): Cursor => {
   return { createdAt: new Date(createdAt), id };
 };
 
-export const createTask = async (
-  projectId: string,
-  input: Pick<typeof tasks.$inferInsert, "title" | "description" | "status">,
-) => {
+// クライアントが作成・更新で指定できる項目
+type TaskInput = Pick<
+  typeof tasks.$inferInsert,
+  "title" | "description" | "status"
+>;
+
+export const createTask = async (projectId: string, input: TaskInput) => {
   const [task] = await db
     .insert(tasks)
     .values({ projectId, ...input })
@@ -81,5 +84,14 @@ export const findTask = async (id: string) => {
     .select(taskColumns)
     .from(tasks)
     .where(eq(tasks.id, id));
+  return task;
+};
+
+export const updateTask = async (id: string, input: Partial<TaskInput>) => {
+  const [task] = await db
+    .update(tasks)
+    .set(input)
+    .where(eq(tasks.id, id))
+    .returning(taskColumns);
   return task;
 };

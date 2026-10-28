@@ -259,3 +259,44 @@ describe("GET /projects/:projectId/tasks/:taskId", () => {
     });
   });
 });
+
+describe("PATCH /projects/:projectId/tasks/:taskId", () => {
+  it("メンバーが一部の項目を送ると、送った項目だけを更新して 200 と更新後のタスクを返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const createRes = await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({
+        title: "Design the top page",
+        description: "Use the new brand colors",
+      }),
+    });
+    const created = await createRes.json();
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ status: "done" }),
+      },
+    );
+
+    const updated = {
+      id: created.id,
+      title: "Design the top page",
+      description: "Use the new brand colors",
+      status: "done",
+      createdAt: created.createdAt,
+    };
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(updated);
+
+    const getRes = await app.request(
+      `/projects/${project.id}/tasks/${created.id}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    expect(await getRes.json()).toEqual(updated);
+  });
+});
