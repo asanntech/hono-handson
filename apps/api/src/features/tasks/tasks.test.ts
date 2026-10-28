@@ -49,6 +49,47 @@ describe("/projects/:projectId/tasks 配下の認証", () => {
   );
 });
 
+describe("メンバーでないユーザー", () => {
+  it.each([
+    { method: "POST", path: "", body: { title: "Hijacked" } },
+    { method: "GET", path: "" },
+    { method: "GET", path: "/:taskId" },
+    { method: "PATCH", path: "/:taskId", body: { title: "Hijacked" } },
+    { method: "DELETE", path: "/:taskId" },
+  ])(
+    "$method /projects/:projectId/tasks$path を呼ぶと 404 を返し、タスクを変えない",
+    async ({ method, path, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const createRes = await app.request(`/projects/${project.id}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ title: "Design the top page" }),
+      });
+      const created = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks${path.replace(":taskId", created.id)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: tasks.id, title: tasks.title })
+          .from(tasks)
+          .where(eq(tasks.projectId, project.id)),
+      ).toEqual([{ id: created.id, title: "Design the top page" }]);
+    },
+  );
+});
+
 describe("POST /projects/:projectId/tasks", () => {
   it('メンバーが title を送ると 201 と { id, title, description: "", status: "todo", createdAt } を返す', async () => {
     const alice = await signupAs("alice@example.com");
