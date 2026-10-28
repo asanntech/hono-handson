@@ -1,0 +1,1 @@
+CREATE INDEX "comments_task_id_created_at_id_idx" ON "comments" USING btree ("task_id","created_at","id");
