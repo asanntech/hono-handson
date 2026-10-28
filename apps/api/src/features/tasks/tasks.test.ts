@@ -228,6 +228,36 @@ describe("GET /projects/:projectId/tasks", () => {
       nextCursor: null,
     });
   });
+
+  it("createdAt が同じタスクが limit をまたいで並んでいても、ページの境目で重複も欠落もしない", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    // 1 つの INSERT の中では now() が同じ値になるため、3 件とも createdAt が同じになる。
+    // DB の既定値で作成日時を付けるので、API で作ったときと同じ精度の値が入る
+    await db.insert(tasks).values([
+      { projectId: project.id, title: "Task A" },
+      { projectId: project.id, title: "Task B" },
+      { projectId: project.id, title: "Task C" },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    const firstPage = await firstRes.json();
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+    const secondPage = await secondRes.json();
+
+    const titles = [...firstPage.items, ...secondPage.items].map(
+      (task: { title: string }) => task.title,
+    );
+    // 同じ時刻のタスクどうしの順番は id で決まり、id はランダムなので、並びではなく顔ぶれを確かめる
+    expect(titles.toSorted()).toEqual(["Task A", "Task B", "Task C"]);
+    expect(secondPage.nextCursor).toBeNull();
+  });
 });
 
 describe("GET /projects/:projectId/tasks/:taskId", () => {

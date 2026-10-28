@@ -5,7 +5,7 @@ CREATE TABLE "tasks" (
 	"title" text NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
 	"status" "task_status" DEFAULT 'todo' NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp (3) with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;

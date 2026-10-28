@@ -59,7 +59,9 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   status: taskStatus("status").notNull().default("todo"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  // 一覧のカーソルに入れる値。JS の Date はミリ秒までしか持てないため、DB もミリ秒にそろえる。
+  // 既定のマイクロ秒のままだと、カーソルにした時点で切り捨てられ、ページの境目のタスクが欠ける
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
     .notNull()
     .defaultNow(),
 });
