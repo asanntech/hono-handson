@@ -99,22 +99,30 @@ describe("CSRF", () => {
 
 describe("リクエストボディの上限", () => {
   it("ボディがちょうど 100KB なら上限に掛けず、後続の処理に渡す", async () => {
-    const res = await app.request("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "a".repeat(100 * 1024),
-    });
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "a".repeat(100 * 1024),
+      },
+      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+    );
 
     // 本文を最後まで読んだうえで JSON として不正なので、バリデーターが 400 を返す
     expect(res.status).toBe(400);
   });
 
   it("ボディが 100KB を超えると 413 を返す", async () => {
-    const res = await app.request("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "a".repeat(100 * 1024 + 1),
-    });
+    const res = await app.request(
+      "/auth/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "a".repeat(100 * 1024 + 1),
+      },
+      { incoming: { socket: { remoteAddress: "192.0.2.1" } } },
+    );
 
     expect(res.status).toBe(413);
     expect(await res.json()).toEqual({

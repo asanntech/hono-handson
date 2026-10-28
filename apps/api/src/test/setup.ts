@@ -3,6 +3,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import { afterEach } from "vitest";
 import { db } from "../db/client.ts";
 import * as schema from "../db/schema.ts";
+import { loginRateLimitStore } from "../middleware/rate-limit.ts";
 
 // schema.ts に定義したテーブルをすべて対象にし、テーブルを足しても空にし忘れないようにする
 const tableNames = Object.values(schema)
@@ -13,4 +14,9 @@ const tableNames = Object.values(schema)
 // 各テストの後にテーブルを空にし、次のテストにデータを漏らさない。実行後にもデータを残さない
 afterEach(async () => {
   await db.execute(sql.raw(`TRUNCATE ${tableNames}`));
+});
+
+// ログインの試行回数はメモリに残るため、テーブルと同じく各テストの後に消す
+afterEach(() => {
+  loginRateLimitStore.resetAll();
 });

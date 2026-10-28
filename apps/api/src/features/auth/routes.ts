@@ -3,6 +3,7 @@ import { deleteCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { requireAuth, TOKEN_COOKIE_NAME } from "../../middleware/auth.ts";
+import { loginRateLimit } from "../../middleware/rate-limit.ts";
 import { validator } from "../../middleware/validator.ts";
 import {
   findUser,
@@ -49,7 +50,7 @@ export const auth = new Hono()
     await setTokenCookie(c, user.id);
     return c.json(user, 201);
   })
-  .post("/login", validator("json", loginSchema), async (c) => {
+  .post("/login", loginRateLimit, validator("json", loginSchema), async (c) => {
     const user = await login(c.req.valid("json"));
     await setTokenCookie(c, user.id);
     return c.json(user, 200);
