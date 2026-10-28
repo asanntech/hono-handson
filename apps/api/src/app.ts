@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
+import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { env } from "./env.ts";
 import { auth } from "./features/auth/routes.ts";
@@ -10,6 +11,8 @@ import { projects } from "./features/projects/routes.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.ts";
 
 export const app = new Hono()
+  // ログと New Relic でリクエストを追えるよう、最初にリクエストIDを振り、X-Request-Id ヘッダーで返す
+  .use(requestId())
   // 全レスポンスに、MIME スニッフィングや iframe への埋め込みを禁じるヘッダーを付ける
   .use(secureHeaders())
   // プリフライトは Cookie を付けずに来るため、認証より前で応答する。Cookie を送れるよう credentials を許可する
