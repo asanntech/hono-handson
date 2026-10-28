@@ -75,6 +75,49 @@ describe("/projects/:projectId/tasks/:taskId/comments 配下の認証", () => {
   );
 });
 
+describe("メンバーでないユーザー", () => {
+  it.each([
+    { method: "POST", path: "", body: { body: "Hijacked" } },
+    { method: "GET", path: "" },
+    { method: "PATCH", path: "/:commentId", body: { body: "Hijacked" } },
+    { method: "DELETE", path: "/:commentId" },
+  ])(
+    "$method /projects/:projectId/tasks/:taskId/comments$path を呼ぶと 404 を返し、コメントを変えない",
+    async ({ method, path, body }) => {
+      const alice = await signupAs("alice@example.com");
+      const bob = await signupAs("bob@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const task = await createTaskAs(alice, project.id, "Design the top page");
+      const createRes = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: JSON.stringify({ body: "Looks good to me" }),
+        },
+      );
+      const created = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${task.id}/comments${path.replace(":commentId", created.id)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: bob.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: comments.id, body: comments.body })
+          .from(comments),
+      ).toEqual([{ id: created.id, body: "Looks good to me" }]);
+    },
+  );
+});
+
 describe("POST /projects/:projectId/tasks/:taskId/comments", () => {
   it("メンバーが body を送ると 201 と { id, body, authorId, createdAt } を返す", async () => {
     const alice = await signupAs("alice@example.com");
@@ -235,6 +278,70 @@ describe("DELETE /projects/:projectId/tasks/:taskId/comments/:commentId", () => 
     );
     expect(await listRes.json()).toEqual([]);
   });
+});
+
+describe("/projects/:projectId/tasks/:taskId/comments で見つからないタスク", () => {
+  const methods = [
+    { method: "POST", path: "", body: { body: "Hijacked" } },
+    { method: "GET", path: "" },
+    { method: "PATCH", path: "/:commentId", body: { body: "Hijacked" } },
+    { method: "DELETE", path: "/:commentId" },
+  ];
+  // 呼ぶ人は両方のプロジェクトのメンバーで、コメントを書いた本人。
+  // 別のプロジェクトのタスクは、パスのプロジェクトからは見えないものとして扱う
+  const taskIds = [
+    {
+      case: "別のプロジェクトのタスク ID",
+      taskIdOf: (otherProjectTask: { id: string }) => otherProjectTask.id,
+    },
+    {
+      case: "存在しない ID",
+      taskIdOf: () => "00000000-0000-4000-8000-000000000000",
+    },
+    { case: "UUID の形でない ID", taskIdOf: () => "not-a-uuid" },
+  ];
+
+  it.each(
+    methods.flatMap((method) => taskIds.map((id) => ({ ...method, ...id }))),
+  )(
+    "$method で$case を指定すると 404 を返し、コメントを変えない",
+    async ({ method, path, body, taskIdOf }) => {
+      const alice = await signupAs("alice@example.com");
+      const project = await createProjectAs(alice, "Website Renewal");
+      const otherProject = await createProjectAs(alice, "Mobile App");
+      const otherProjectTask = await createTaskAs(
+        alice,
+        otherProject.id,
+        "Design the top page",
+      );
+      const createRes = await app.request(
+        `/projects/${otherProject.id}/tasks/${otherProjectTask.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: JSON.stringify({ body: "Looks good to me" }),
+        },
+      );
+      const created = await createRes.json();
+
+      const res = await app.request(
+        `/projects/${project.id}/tasks/${taskIdOf(otherProjectTask)}/comments${path.replace(":commentId", created.id)}`,
+        {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+          body: body && JSON.stringify(body),
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: { message: "Not Found" } });
+      expect(
+        await db
+          .select({ id: comments.id, body: comments.body })
+          .from(comments),
+      ).toEqual([{ id: created.id, body: "Looks good to me" }]);
+    },
+  );
 });
 
 describe("タスクとプロジェクトの削除", () => {
