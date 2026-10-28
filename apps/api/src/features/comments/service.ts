@@ -38,3 +38,7 @@ export const updateComment = async (id: string, input: { body: string }) => {
     .returning(commentColumns);
   return comment;
 };
+
+export const deleteComment = async (id: string) => {
+  await db.delete(comments).where(eq(comments.id, id));
+};

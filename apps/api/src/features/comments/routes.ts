@@ -4,7 +4,12 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { MemberVariables } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
-import { createComment, listComments, updateComment } from "./service.ts";
+import {
+  createComment,
+  deleteComment,
+  listComments,
+  updateComment,
+} from "./service.ts";
 
 const commentSchema = z.object({
   body: z.string(),
@@ -49,4 +54,8 @@ export const comments = new Hono<{ Variables: MemberVariables }>()
       c.req.valid("json"),
     );
     return c.json(comment, 200);
+  })
+  .delete("/:commentId", async (c) => {
+    await deleteComment(c.req.param("commentId"));
+    return c.body(null, 204);
   });
