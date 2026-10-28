@@ -9,6 +9,7 @@ import { server } from "../test/server.ts";
 
 type LoginResponse = InferResponseType<typeof api.auth.login.$post, 200>;
 type MeResponse = InferResponseType<typeof api.auth.me.$get, 200>;
+type ProjectsResponse = InferResponseType<typeof api.projects.$get, 200>;
 
 test("正しいメールアドレスとパスワードでログインしたとき、プロジェクト一覧画面へ遷移する", async () => {
   let requestBody: unknown;
@@ -26,6 +27,7 @@ test("正しいメールアドレスとパスワードでログインしたと�
         email: "alice@example.com",
       }),
     ),
+    http.get("/api/projects", () => HttpResponse.json<ProjectsResponse>([])),
   );
   const { router } = renderApp("/login");
   const user = userEvent.setup();

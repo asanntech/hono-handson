@@ -1,0 +1,37 @@
+import { screen } from "@testing-library/react";
+import type { InferResponseType } from "hono/client";
+import { HttpResponse, http } from "msw";
+import { expect, test } from "vitest";
+import type { api } from "../../../lib/api.ts";
+import { renderApp } from "../../../test/render.tsx";
+import { server } from "../../../test/server.ts";
+
+type MeResponse = InferResponseType<typeof api.auth.me.$get, 200>;
+type ProjectsResponse = InferResponseType<typeof api.projects.$get, 200>;
+
+test("プロジェクト一覧を開いたとき、所属するプロジェクトの名前が、そのタスク一覧へのリンクとして並ぶ", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects", () =>
+      HttpResponse.json<ProjectsResponse>([
+        { id: "00000000-0000-4000-8000-0000000000a1", name: "Website" },
+        { id: "00000000-0000-4000-8000-0000000000a2", name: "Mobile App" },
+      ]),
+    ),
+  );
+  renderApp("/projects");
+
+  expect(await screen.findByRole("link", { name: "Website" })).toHaveAttribute(
+    "href",
+    "/projects/00000000-0000-4000-8000-0000000000a1",
+  );
+  expect(screen.getByRole("link", { name: "Mobile App" })).toHaveAttribute(
+    "href",
+    "/projects/00000000-0000-4000-8000-0000000000a2",
+  );
+});
