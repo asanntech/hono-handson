@@ -1,6 +1,8 @@
 import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it } from "vitest";
 import { app } from "../../app.ts";
+import { db } from "../../db/client.ts";
+import { tasks } from "../../db/schema.ts";
 
 // ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
 const signupAs = async (email: string) => {
@@ -66,6 +68,57 @@ describe("POST /projects/:projectId/tasks", () => {
       description: "Use the new brand colors",
       status: "in_progress",
       createdAt: expect.any(String),
+    });
+  });
+});
+
+describe("GET /projects/:projectId/tasks", () => {
+  it("そのプロジェクトのタスクだけを新しい順に { items, nextCursor: null } で返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const otherProject = await createProjectAs(alice, "Mobile App");
+    // 並び順を確かめるため、作成日時を指定して DB に直接入れる
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Older task",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Newer task",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: otherProject.id,
+        title: "Task in another project",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    ]);
+
+    const res = await app.request(`/projects/${project.id}/tasks`, {
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      items: [
+        {
+          id: expect.any(String),
+          title: "Newer task",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: expect.any(String),
+          title: "Older task",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      nextCursor: null,
     });
   });
 });
