@@ -62,3 +62,44 @@ describe("POST /projects/:projectId/tasks/:taskId/comments", () => {
     });
   });
 });
+
+describe("GET /projects/:projectId/tasks/:taskId/comments", () => {
+  it("そのタスクのコメントだけを古い順に返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const task = await createTaskAs(alice, project.id, "Design the top page");
+    const otherTask = await createTaskAs(alice, project.id, "Write the copy");
+    for (const [taskId, body] of [
+      [task.id, "First"],
+      [otherTask.id, "On another task"],
+      [task.id, "Second"],
+    ]) {
+      await app.request(`/projects/${project.id}/tasks/${taskId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body }),
+      });
+    }
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([
+      {
+        id: expect.any(String),
+        body: "First",
+        authorId: alice.id,
+        createdAt: expect.any(String),
+      },
+      {
+        id: expect.any(String),
+        body: "Second",
+        authorId: alice.id,
+        createdAt: expect.any(String),
+      },
+    ]);
+  });
+});

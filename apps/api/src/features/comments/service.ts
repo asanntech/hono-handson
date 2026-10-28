@@ -1,3 +1,4 @@
+import { asc, eq } from "drizzle-orm";
 import { db } from "../../db/client.ts";
 import { comments } from "../../db/schema.ts";
 
@@ -20,3 +21,11 @@ export const createComment = async (
     .returning(commentColumns);
   return comment;
 };
+
+export const listComments = async (taskId: string) =>
+  db
+    .select(commentColumns)
+    .from(comments)
+    .where(eq(comments.taskId, taskId))
+    // 作成日時が同じコメントの順番も決まるよう、id を 2 つ目の並び順にする
+    .orderBy(asc(comments.createdAt), asc(comments.id));
