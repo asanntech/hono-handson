@@ -53,9 +53,10 @@ export const taskStatus = pgEnum("task_status", [
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // プロジェクトを消したら、そのタスクも DB が一緒に消す
   projectId: uuid("project_id")
     .notNull()
-    .references(() => projects.id),
+    .references(() => projects.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   status: taskStatus("status").notNull().default("todo"),

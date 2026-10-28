@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it } from "vitest";
 import { app } from "../../app.ts";
@@ -395,5 +396,27 @@ describe("DELETE /projects/:projectId/tasks/:taskId", () => {
     );
     expect(getRes.status).toBe(404);
     expect(await getRes.json()).toEqual({ error: { message: "Not Found" } });
+  });
+});
+
+describe("プロジェクトの削除", () => {
+  it("プロジェクトを削除すると、そのプロジェクトのタスクも消える", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await app.request(`/projects/${project.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+      body: JSON.stringify({ title: "Design the top page" }),
+    });
+
+    const res = await app.request(`/projects/${project.id}`, {
+      method: "DELETE",
+      headers: { Cookie: alice.cookie },
+    });
+
+    expect(res.status).toBe(204);
+    expect(
+      await db.select().from(tasks).where(eq(tasks.projectId, project.id)),
+    ).toEqual([]);
   });
 });
