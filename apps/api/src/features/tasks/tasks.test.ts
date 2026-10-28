@@ -27,6 +27,28 @@ const createProjectAs = async (user: { cookie: string }, name: string) => {
   return (await res.json()) as { id: string; name: string };
 };
 
+describe("/projects/:projectId/tasks 配下の認証", () => {
+  // 存在しない ID でよい。認証はプロジェクトやタスクを探すより前に行うため
+  const projectId = "00000000-0000-4000-8000-000000000000";
+  const taskId = "00000000-0000-4000-8000-000000000001";
+
+  it.each([
+    { method: "POST", path: `/projects/${projectId}/tasks` },
+    { method: "GET", path: `/projects/${projectId}/tasks` },
+    { method: "GET", path: `/projects/${projectId}/tasks/${taskId}` },
+    { method: "PATCH", path: `/projects/${projectId}/tasks/${taskId}` },
+    { method: "DELETE", path: `/projects/${projectId}/tasks/${taskId}` },
+  ])(
+    "Cookie を付けずに $method $path を呼ぶと 401 を返す",
+    async ({ method, path }) => {
+      const res = await app.request(path, { method });
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: { message: "Unauthorized" } });
+    },
+  );
+});
+
 describe("POST /projects/:projectId/tasks", () => {
   it('メンバーが title を送ると 201 と { id, title, description: "", status: "todo", createdAt } を返す', async () => {
     const alice = await signupAs("alice@example.com");
