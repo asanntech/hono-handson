@@ -1,0 +1,64 @@
+import { parseSetCookie } from "set-cookie-parser";
+import { describe, expect, it } from "vitest";
+import { app } from "../../app.ts";
+
+// ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
+const signupAs = async (email: string) => {
+  const res = await app.request("/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "password123" }),
+  });
+  const { id } = await res.json();
+  const [cookie] = parseSetCookie(res);
+  return { id: id as string, cookie: `token=${cookie.value}` };
+};
+
+// user としてプロジェクトを作り、作ったプロジェクトの { id, name } を返す。user は owner になる
+const createProjectAs = async (user: { cookie: string }, name: string) => {
+  const res = await app.request("/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: user.cookie },
+    body: JSON.stringify({ name }),
+  });
+  return (await res.json()) as { id: string; name: string };
+};
+
+// user としてプロジェクトにタスクを作り、作ったタスクの { id } を返す
+const createTaskAs = async (
+  user: { cookie: string },
+  projectId: string,
+  title: string,
+) => {
+  const res = await app.request(`/projects/${projectId}/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: user.cookie },
+    body: JSON.stringify({ title }),
+  });
+  return (await res.json()) as { id: string };
+};
+
+describe("POST /projects/:projectId/tasks/:taskId/comments", () => {
+  it("メンバーが body を送ると 201 と { id, body, authorId, createdAt } を返す", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    const task = await createTaskAs(alice, project.id, "Design the top page");
+
+    const res = await app.request(
+      `/projects/${project.id}/tasks/${task.id}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: alice.cookie },
+        body: JSON.stringify({ body: "Looks good to me" }),
+      },
+    );
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      id: expect.any(String),
+      body: "Looks good to me",
+      authorId: alice.id,
+      createdAt: expect.any(String),
+    });
+  });
+});

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { taskStatus } from "../../db/schema.ts";
 import { requireMember } from "../../middleware/authorize.ts";
 import { validator } from "../../middleware/validator.ts";
+import { comments } from "../comments/routes.ts";
 import {
   createTask,
   deleteTask,
@@ -97,4 +98,5 @@ export const tasks = new Hono()
   .delete("/:taskId", taskParamValidator, async (c) => {
     await deleteTask(c.get("projectId"), c.req.valid("param").taskId);
     return c.body(null, 204);
-  });
+  })
+  .route("/:taskId/comments", comments);

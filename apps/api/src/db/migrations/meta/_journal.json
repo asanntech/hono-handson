@@ -50,6 +50,13 @@
       "when": 1793172495765,
       "tag": "0006_add_tasks_list_index",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793174545084,
+      "tag": "0007_create_comments",
+      "breakpoints": true
     }
   ]
 }
