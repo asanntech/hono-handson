@@ -15,6 +15,7 @@ const listTasksQuerySchema = z.object({
   // クエリパラメータは文字列で届くため、coerce で数値に変換してから検証する
   limit: z.coerce.number().default(20),
   cursor: z.string().optional(),
+  status: z.enum(taskStatus.enumValues).optional(),
 });
 
 // projects のルートから /projects/:projectId/tasks につなぐ。ログインの確認は projects 側の requireAuth が行う。

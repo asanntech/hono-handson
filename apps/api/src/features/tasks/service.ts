@@ -1,6 +1,6 @@
 import { and, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "../../db/client.ts";
-import { tasks } from "../../db/schema.ts";
+import { type taskStatus, tasks } from "../../db/schema.ts";
 
 // API が返すタスクの項目。projectId はパスで分かっているので含めない
 const taskColumns = {
@@ -43,7 +43,11 @@ export const createTask = async (
 
 export const listTasks = async (
   projectId: string,
-  query: { limit: number; cursor?: string },
+  query: {
+    limit: number;
+    cursor?: string;
+    status?: (typeof taskStatus.enumValues)[number];
+  },
 ) => {
   const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
   const rows = await db
@@ -52,6 +56,7 @@ export const listTasks = async (
     .where(
       and(
         eq(tasks.projectId, projectId),
+        query.status && eq(tasks.status, query.status),
         // 並び順（createdAt の降順、同じなら id の降順）で、カーソルより後ろにあるタスクだけを取る
         cursor &&
           or(

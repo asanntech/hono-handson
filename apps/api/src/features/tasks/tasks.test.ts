@@ -167,4 +167,65 @@ describe("GET /projects/:projectId/tasks", () => {
     ).toEqual(["Task 1"]);
     expect(secondPage.nextCursor).toBeNull();
   });
+
+  it("status を指定すると、その status のタスクだけを返し、絞り込んだままページングできる", async () => {
+    const alice = await signupAs("alice@example.com");
+    const project = await createProjectAs(alice, "Website Renewal");
+    await db.insert(tasks).values([
+      {
+        projectId: project.id,
+        title: "Todo 1",
+        status: "todo",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Done 1",
+        status: "done",
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Todo 2",
+        status: "todo",
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+      {
+        projectId: project.id,
+        title: "Todo 3",
+        status: "todo",
+        createdAt: new Date("2026-01-04T00:00:00.000Z"),
+      },
+    ]);
+
+    const firstRes = await app.request(
+      `/projects/${project.id}/tasks?status=todo&limit=2`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(firstRes.status).toBe(200);
+    const firstPage = await firstRes.json();
+    expect(
+      firstPage.items.map((task: { title: string }) => task.title),
+    ).toEqual(["Todo 3", "Todo 2"]);
+
+    const secondRes = await app.request(
+      `/projects/${project.id}/tasks?status=todo&limit=2&cursor=${firstPage.nextCursor}`,
+      { headers: { Cookie: alice.cookie } },
+    );
+
+    expect(secondRes.status).toBe(200);
+    expect(await secondRes.json()).toEqual({
+      items: [
+        {
+          id: expect.any(String),
+          title: "Todo 1",
+          description: "",
+          status: "todo",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      nextCursor: null,
+    });
+  });
 });
