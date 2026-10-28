@@ -21,6 +21,7 @@ Hono を使い、実務で必要なバックエンド開発の知識を、TDD �
 | 認証 | 自前実装（JWT を HttpOnly Cookie に入れる） | `hono/jwt`、`hono/cookie`、`hono/csrf` を使って、認証の仕組みを自分で理解する |
 | バリデーション | `@hono/zod-validator` のみ | シンプルに保つ。API の仕様は RPC の型とテストで保証する（OpenAPI は扱わない） |
 | テスト | Vitest + 本物の PostgreSQL での結合テスト | `app.request()` や `testClient` を使い、HTTP 層から実際の振る舞いを保証する |
+| 監視 | New Relic（Node.js エージェント、無料枠）+ pino | APM とログを1か所で見る、実務の監視を体験する。ログは pino で書き、エージェントが New Relic に転送する |
 | 構成 | 機能別ルート + サービス関数 | Hono 公式のベストプラクティスに沿い、Controller を作らず型推論を活かす |
 | ツール | pnpm workspaces + Biome、実行は tsx の watch モード | 設定を少なく保ち、Hono 以外の設定作業を減らす |
 | デプロイ | ローカルのみ | Docker Compose とローカルの Node.js で完結させる（CI と本番デプロイは扱わない） |
@@ -118,10 +119,12 @@ docker-compose.yml
 - 学ぶこと: `secureHeaders`、`cors`、`csrf`、`bodyLimit`、ログイン API へのレート制限（`hono-rate-limiter` などを使う）
 - 理解確認: Cookie 認証で CSRF 対策が必要なのはなぜか？ SameSite 属性だけでは足りないケースは？
 
-### 9. ロギング
+### 9. ロギングと監視（New Relic）
 
-- 学ぶこと: `requestId` ミドルウェア、pino による構造化ログ、アクセスログ、エラーログとリクエストIDの紐付け
-- 理解確認: 障害調査のとき、リクエストIDは何の役に立つか？
+- 学ぶこと: `requestId` ミドルウェア、pino による構造化ログ、New Relic の Node.js エージェントの導入（プロセスの最初に読み込む）、Hono のルート名でトランザクション名を付けるミドルウェア、`app.onError` での `noticeError`、`requestId` や `userId` のカスタム属性、Logs in context によるログとトレースの紐付け、NRQL による調査
+- テスト方針: テストではエージェントを無効にする。New Relic の API は薄いモジュールで包み、呼び出しをモックして検証する。New Relic の画面での確認は手動で行う
+- 完了条件: テストがすべて通り、New Relic の画面でトランザクション名・エラー・ログを確認し、NRQL で特定の `requestId` のログを探せる
+- 理解確認: 障害調査のとき、リクエストID、トレース、ログはそれぞれ何の役に立ち、どう組み合わせるか？ 4xx を `noticeError` しないのはなぜか？
 
 ### 10. RPC と SPA
 
@@ -135,3 +138,4 @@ docker-compose.yml
 - CI と本番デプロイ
 - ファイルアップロード、リアルタイム通知（SSE / WebSocket）
 - ラベル、担当者、マルチテナント
+- New Relic のアラート、ダッシュボードの作り込み、Browser 監視、OpenTelemetry
