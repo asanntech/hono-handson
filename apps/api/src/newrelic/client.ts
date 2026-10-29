@@ -6,4 +6,5 @@ export const newrelic = {
   setTransactionName: (name: string) => agent.setTransactionName(name),
   addCustomAttributes: (attributes: Record<string, string>) =>
     agent.addCustomAttributes(attributes),
+  noticeError: (error: Error) => agent.noticeError(error),
 };

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
+import { newrelic } from "../newrelic/client.ts";
 import { errorHandler } from "./error-handler.ts";
 
 describe("notFoundHandler", () => {
@@ -79,5 +80,19 @@ describe("errorHandler", () => {
     await testApp.request("/");
 
     expect(consoleError).toHaveBeenCalledWith(error);
+  });
+
+  it("想定外の例外は noticeError で New Relic に送る", async () => {
+    const noticeError = vi.spyOn(newrelic, "noticeError");
+    const error = new Error("connection to db-host:5432 failed");
+    const testApp = new Hono()
+      .get("/", () => {
+        throw error;
+      })
+      .onError(errorHandler);
+
+    await testApp.request("/");
+
+    expect(noticeError).toHaveBeenCalledWith(error);
   });
 });
