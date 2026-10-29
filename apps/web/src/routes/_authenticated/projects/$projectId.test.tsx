@@ -187,3 +187,21 @@ test("最初のページを読み込んでいる途中で末尾が画面に入�
 
   expect(requestCount).toBe(1);
 });
+
+test("タスクが 0 件のとき、「タスクがありません」と表示する", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () =>
+      HttpResponse.json<TasksResponse>({ items: [], nextCursor: null }),
+    ),
+  );
+  renderApp("/projects/00000000-0000-4000-8000-0000000000a1");
+
+  expect(await screen.findByText("タスクがありません")).toBeInTheDocument();
+  expect(screen.queryByRole("list")).not.toBeInTheDocument();
+});

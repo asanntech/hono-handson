@@ -33,6 +33,9 @@ function TasksPage() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
+  // 読み込んだページのタスクを、1 つの一覧としてつなげる
+  const items = tasks.data?.pages.flatMap((page) => page.items);
+
   // 一覧の末尾に置いた要素が画面に入ったら、次のページを読み込む
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { fetchNextPage } = tasks;
@@ -53,10 +56,11 @@ function TasksPage() {
   return (
     <div className="grid gap-4">
       <h1 className="text-2xl font-bold">タスク</h1>
-      <ul className="grid gap-2">
-        {tasks.data?.pages
-          .flatMap((page) => page.items)
-          .map((task) => (
+      {items?.length === 0 ? (
+        <p className="text-muted-foreground">タスクがありません</p>
+      ) : (
+        <ul className="grid gap-2">
+          {items?.map((task) => (
             <li
               key={task.id}
               className="flex items-center justify-between rounded-lg border p-4"
@@ -67,7 +71,8 @@ function TasksPage() {
               </span>
             </li>
           ))}
-      </ul>
+        </ul>
+      )}
       <div ref={sentinelRef} />
     </div>
   );
