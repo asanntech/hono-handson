@@ -95,4 +95,22 @@ describe("errorHandler", () => {
 
     expect(noticeError).toHaveBeenCalledWith(error);
   });
+
+  // 4xx はクライアントの誤りで想定内。送ると New Relic のエラーが、調査の要らないもので埋まる
+  it.each([400, 401, 403, 404, 409] as const)(
+    "HTTPException(%i) は noticeError で送らない",
+    async (status) => {
+      const noticeError = vi.spyOn(newrelic, "noticeError");
+      const testApp = new Hono()
+        .get("/", () => {
+          throw new HTTPException(status);
+        })
+        .onError(errorHandler);
+
+      const res = await testApp.request("/");
+
+      expect(res.status).toBe(status);
+      expect(noticeError).not.toHaveBeenCalled();
+    },
+  );
 });
