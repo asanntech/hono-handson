@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "dev": "NEW_RELIC_HOME=src/newrelic tsx watch --env-file=../../.env --import newrelic/esm-loader.mjs -r newrelic src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc",
     "db:generate": "drizzle-kit generate",
