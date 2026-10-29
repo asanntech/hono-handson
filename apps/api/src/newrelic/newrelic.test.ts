@@ -64,4 +64,24 @@ describe("カスタム属性", () => {
       requestId: res.headers.get("x-request-id"),
     });
   });
+
+  it("ログイン済みのリクエストでは、userId をカスタム属性に付ける", async () => {
+    const signup = await app.request("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "password123",
+      }),
+    });
+    const { id } = await signup.json();
+    const [cookie] = parseSetCookie(signup);
+    const addCustomAttributes = vi.spyOn(newrelic, "addCustomAttributes");
+
+    await app.request("/projects", {
+      headers: { Cookie: `token=${cookie.value}` },
+    });
+
+    expect(addCustomAttributes).toHaveBeenCalledWith({ userId: id });
+  });
 });
