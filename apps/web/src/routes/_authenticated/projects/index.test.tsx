@@ -35,3 +35,21 @@ test("プロジェクト一覧を開いたとき、所属するプロジェク�
     "/projects/00000000-0000-4000-8000-0000000000a2",
   );
 });
+
+test("所属するプロジェクトが 0 件のとき、「プロジェクトがありません」と表示する", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects", () => HttpResponse.json<ProjectsResponse>([])),
+  );
+  renderApp("/projects");
+
+  expect(
+    await screen.findByText("プロジェクトがありません"),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("list")).not.toBeInTheDocument();
+});

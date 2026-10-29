@@ -22,19 +22,23 @@ function ProjectsPage() {
   return (
     <div className="grid gap-4">
       <h1 className="text-2xl font-bold">プロジェクト</h1>
-      <ul className="grid gap-2">
-        {projects.data?.map((project) => (
-          <li key={project.id}>
-            <Link
-              to="/projects/$projectId"
-              params={{ projectId: project.id }}
-              className="block rounded-lg border p-4 hover:bg-muted"
-            >
-              {project.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {projects.data?.length === 0 ? (
+        <p className="text-muted-foreground">プロジェクトがありません</p>
+      ) : (
+        <ul className="grid gap-2">
+          {projects.data?.map((project) => (
+            <li key={project.id}>
+              <Link
+                to="/projects/$projectId"
+                params={{ projectId: project.id }}
+                className="block rounded-lg border p-4 hover:bg-muted"
+              >
+                {project.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
