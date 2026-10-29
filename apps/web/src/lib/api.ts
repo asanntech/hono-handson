@@ -9,5 +9,18 @@ export const api = hc<AppType>(`${location.origin}/api`);
 // RPC の型に現れない（!res.ok の分岐でも res.json() は成功時の型のまま）。そのため web 側で形を書く
 type ApiErrorBody = { error: { message: string } };
 
-export const readErrorMessage = async (res: { json(): Promise<unknown> }) =>
-  ((await res.json()) as ApiErrorBody).error.message;
+// 画面がステータスで表示を出し分けられるよう、メッセージと一緒にステータスを持たせる
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export const toApiError = async (res: {
+  status: number;
+  json(): Promise<unknown>;
+}) =>
+  new ApiError(res.status, ((await res.json()) as ApiErrorBody).error.message);

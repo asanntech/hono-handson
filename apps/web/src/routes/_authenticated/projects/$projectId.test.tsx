@@ -205,3 +205,23 @@ test("タスクが 0 件のとき、「タスクがありません」と表示�
   expect(await screen.findByText("タスクがありません")).toBeInTheDocument();
   expect(screen.queryByRole("list")).not.toBeInTheDocument();
 });
+
+test("メンバーでないプロジェクトのタスク一覧を開いた（404）とき、「プロジェクトが見つかりません」と表示する", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () =>
+      HttpResponse.json({ error: { message: "Not Found" } }, { status: 404 }),
+    ),
+  );
+  renderApp("/projects/00000000-0000-4000-8000-0000000000a1");
+
+  expect(
+    await screen.findByText("プロジェクトが見つかりません"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("タスクがありません")).not.toBeInTheDocument();
+});

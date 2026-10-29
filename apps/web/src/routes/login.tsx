@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, readErrorMessage } from "@/lib/api";
+import { api, toApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -17,7 +17,7 @@ function LoginPage() {
     mutationFn: async (json: { email: string; password: string }) => {
       const res = await api.auth.login.$post({ json });
       if (!res.ok) {
-        throw new Error(await readErrorMessage(res));
+        throw await toApiError(res);
       }
       return res.json();
     },

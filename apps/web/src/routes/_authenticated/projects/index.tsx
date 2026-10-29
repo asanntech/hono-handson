@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { api } from "@/lib/api";
+import { api, toApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/projects/")({
   component: ProjectsPage,
@@ -13,7 +13,7 @@ function ProjectsPage() {
       const res = await api.projects.$get();
       // hc は 4xx / 5xx でも例外を投げない。失敗を TanStack Query のエラーとして扱うため、自分で投げる
       if (!res.ok) {
-        throw new Error("プロジェクトを取得できませんでした");
+        throw await toApiError(res);
       }
       return res.json();
     },
