@@ -1,7 +1,11 @@
+import { Hono } from "hono";
+import { requestId } from "hono/request-id";
 import { parseSetCookie } from "set-cookie-parser";
 import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
 import { logger } from "../logger.ts";
+import { errorHandler } from "./error-handler.ts";
+import { requestLogger } from "./request-logger.ts";
 
 describe("requestLogger", () => {
   it("リクエストが終わると、リクエストID・メソッド・パス・ステータス・処理時間を 1 件のアクセスログに出す", async () => {
@@ -41,6 +45,24 @@ describe("requestLogger", () => {
 
     expect(info).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/projects", status: 200, userId: id }),
+      "request completed",
+    );
+  });
+
+  it("ハンドラで想定外の例外が起きても、ステータス 500 のアクセスログを出す", async () => {
+    const info = vi.spyOn(logger, "info");
+    const testApp = new Hono()
+      .use(requestId())
+      .use(requestLogger)
+      .get("/", () => {
+        throw new Error("connection to db-host:5432 failed");
+      })
+      .onError(errorHandler);
+
+    await testApp.request("/");
+
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/", status: 500 }),
       "request completed",
     );
   });
