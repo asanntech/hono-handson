@@ -53,3 +53,15 @@ describe("トランザクション名", () => {
     expect(setTransactionName).toHaveBeenNthCalledWith(2, "GET /*");
   });
 });
+
+describe("カスタム属性", () => {
+  it("どのリクエストでも、requestId をカスタム属性に付ける", async () => {
+    const addCustomAttributes = vi.spyOn(newrelic, "addCustomAttributes");
+
+    const res = await app.request("/health");
+
+    expect(addCustomAttributes).toHaveBeenCalledWith({
+      requestId: res.headers.get("x-request-id"),
+    });
+  });
+});
