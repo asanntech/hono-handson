@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { requestId } from "hono/request-id";
 import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
+import { logger } from "../logger.ts";
 import { newrelic } from "../newrelic/client.ts";
 import { errorHandler } from "./error-handler.ts";
 
@@ -68,18 +70,24 @@ describe("errorHandler", () => {
     });
   });
 
-  it("想定外の例外はサーバーのログに出す", async () => {
+  it("想定外の例外は、console.error ではなくリクエストID付きのエラーログに出す", async () => {
     const consoleError = vi.spyOn(console, "error");
+    const loggerError = vi.spyOn(logger, "error");
     const error = new Error("connection to db-host:5432 failed");
     const testApp = new Hono()
+      .use(requestId())
       .get("/", () => {
         throw error;
       })
       .onError(errorHandler);
 
-    await testApp.request("/");
+    const res = await testApp.request("/");
 
-    expect(consoleError).toHaveBeenCalledWith(error);
+    expect(loggerError).toHaveBeenCalledWith(
+      { err: error, requestId: res.headers.get("x-request-id") },
+      "unhandled error",
+    );
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it("想定外の例外は noticeError で New Relic に送る", async () => {
