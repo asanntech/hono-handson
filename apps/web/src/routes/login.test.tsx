@@ -48,3 +48,29 @@ test("正しいメールアドレスとパスワードでログインしたと�
     password: "password123",
   });
 });
+
+test.each([
+  { status: 401, message: "Invalid email or password" },
+  { status: 429, message: "Too Many Requests" },
+])(
+  "ログインが失敗した（$status）とき、API のエラーメッセージを表示し、ログイン画面に留まる",
+  async ({ status, message }) => {
+    server.use(
+      http.post("/api/auth/login", () =>
+        HttpResponse.json({ error: { message } }, { status }),
+      ),
+    );
+    const { router } = renderApp("/login");
+    const user = userEvent.setup();
+
+    await user.type(
+      await screen.findByLabelText("メールアドレス"),
+      "alice@example.com",
+    );
+    await user.type(screen.getByLabelText("パスワード"), "wrong-password");
+    await user.click(screen.getByRole("button", { name: "ログイン" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(router.state.location.pathname).toBe("/login");
+  },
+);

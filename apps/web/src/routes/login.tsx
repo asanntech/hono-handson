@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "@/lib/api";
+import { api, readErrorMessage } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -14,8 +14,13 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const login = useMutation({
-    mutationFn: (json: { email: string; password: string }) =>
-      api.auth.login.$post({ json }),
+    mutationFn: async (json: { email: string; password: string }) => {
+      const res = await api.auth.login.$post({ json });
+      if (!res.ok) {
+        throw new Error(await readErrorMessage(res));
+      }
+      return res.json();
+    },
     onSuccess: () => navigate({ to: "/projects" }),
   });
 
@@ -43,6 +48,11 @@ function LoginPage() {
             <Label htmlFor="password">パスワード</Label>
             <Input id="password" name="password" type="password" required />
           </div>
+          {login.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {login.error.message}
+            </p>
+          )}
           <Button type="submit" disabled={login.isPending}>
             ログイン
           </Button>
