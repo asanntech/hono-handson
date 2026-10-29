@@ -103,6 +103,17 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...requiredEnv, WEB_ORIGIN: origin })).toThrow();
   });
 
+  // pino も知らないレベルでは例外を投げるが、どの環境変数の誤りかが分からないメッセージになる。
+  // ほかの設定と同じく env の検証で弾き、LOG_MIN_LEVEL が誤っていると分かるようにする
+  it.each(["", "verbose", "INFO"])(
+    "LOG_MIN_LEVEL が pino のレベル以外の %j なら検証エラーを投げる",
+    (level) => {
+      expect(() =>
+        parseEnv({ ...requiredEnv, LOG_MIN_LEVEL: level }),
+      ).toThrow();
+    },
+  );
+
   it.each([undefined, "a".repeat(31)])(
     "JWT_SECRET が %j なら検証エラーを投げる",
     (secret) => {

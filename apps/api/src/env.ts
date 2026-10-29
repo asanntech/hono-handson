@@ -7,7 +7,9 @@ const envSchema = z.object({
     .default("development"),
   // 出力するログの最低レベル。これより低いレベルのログは捨てる（例: info なら debug は出さない）。
   // 各ログのレベルは、logger.info / logger.error などの呼び出しで決まる
-  LOG_MIN_LEVEL: z.string().default("info"),
+  LOG_MIN_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   JWT_SECRET: z.string().min(32),
   // ブラウザが送る Origin ヘッダーと文字列で比べるため、パスや末尾のスラッシュを含まないオリジンの形に限る
