@@ -3,6 +3,7 @@ import type { InferResponseType } from "hono/client";
 import { HttpResponse, http } from "msw";
 import { expect, test } from "vitest";
 import type { api } from "../../../lib/api.ts";
+import { scrollIntoViewAll } from "../../../test/intersection-observer.ts";
 import { renderApp } from "../../../test/render.tsx";
 import { server } from "../../../test/server.ts";
 
@@ -50,4 +51,63 @@ test("タスク一覧を開いたとき、最初のページのタスクのタ�
   expect(within(items[0]).getByText("進行中")).toBeInTheDocument();
   expect(within(items[1]).getByText("Design the API")).toBeInTheDocument();
   expect(within(items[1]).getByText("完了")).toBeInTheDocument();
+});
+
+test("タスク一覧の末尾までスクロールしたとき、次のページを読み込んで後ろに追加する", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get(
+      "/api/projects/00000000-0000-4000-8000-0000000000a1/tasks",
+      ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get("cursor");
+        if (cursor === null) {
+          return HttpResponse.json<TasksResponse>({
+            items: [
+              {
+                id: "00000000-0000-4000-8000-0000000000b1",
+                title: "Write the spec",
+                description: "",
+                status: "in_progress",
+                createdAt: "2026-10-01T00:00:00.000Z",
+              },
+            ],
+            nextCursor: "cursor-after-b1",
+          });
+        }
+        if (cursor === "cursor-after-b1") {
+          return HttpResponse.json<TasksResponse>({
+            items: [
+              {
+                id: "00000000-0000-4000-8000-0000000000b2",
+                title: "Design the API",
+                description: "",
+                status: "done",
+                createdAt: "2026-09-30T00:00:00.000Z",
+              },
+            ],
+            nextCursor: null,
+          });
+        }
+        return HttpResponse.json(
+          { error: { message: "Bad Request" } },
+          { status: 400 },
+        );
+      },
+    ),
+  );
+  renderApp("/projects/00000000-0000-4000-8000-0000000000a1");
+  expect(await screen.findByText("Write the spec")).toBeInTheDocument();
+
+  scrollIntoViewAll();
+
+  expect(await screen.findByText("Design the API")).toBeInTheDocument();
+  const items = screen.getAllByRole("listitem");
+  expect(items).toHaveLength(2);
+  expect(items[0]).toHaveTextContent("Write the spec");
+  expect(items[1]).toHaveTextContent("Design the API");
 });
