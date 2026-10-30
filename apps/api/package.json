@@ -2,6 +2,9 @@
   "name": "@hono-handson/api",
   "private": true,
   "type": "module",
+  "exports": {
+    "./app": "./src/app.ts"
+  },
   "scripts": {
     "dev": "NEW_RELIC_HOME=src/newrelic tsx watch --env-file=../../.env --import newrelic/esm-loader.mjs -r newrelic src/index.ts",
     "test": "vitest run",

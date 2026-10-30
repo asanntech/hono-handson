@@ -15,7 +15,8 @@
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @hono-handson/api db:generate",
     "db:migrate": "pnpm --filter @hono-handson/api db:migrate",
-    "dev": "pnpm --filter @hono-handson/api dev"
+    "dev": "pnpm --filter @hono-handson/api dev",
+    "dev:web": "pnpm --filter @hono-handson/web dev"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15"
