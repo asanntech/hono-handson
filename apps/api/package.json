@@ -6,13 +6,14 @@
     "./app": "./src/app.ts"
   },
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "dev": "NEW_RELIC_HOME=src/newrelic tsx watch --env-file=../../.env --import newrelic/esm-loader.mjs -r newrelic src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
   "devDependencies": {
+    "@types/newrelic": "^9.14.8",
     "@types/node": "^24.19.2",
     "drizzle-kit": "^0.31.11",
     "set-cookie-parser": "^3.2.1",
@@ -27,6 +28,8 @@
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
     "hono-rate-limiter": "^0.5.4",
+    "newrelic": "^14.9.0",
+    "pino": "^10.4.0",
     "postgres": "^3.4.9",
     "zod": "^4.6.7"
   }
