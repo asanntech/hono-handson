@@ -7,6 +7,18 @@ import { logger } from "../logger.ts";
 import { errorHandler } from "./error-handler.ts";
 import { requestLogger } from "./request-logger.ts";
 
+// ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
+const signupAs = async (email: string) => {
+  const res = await app.request("/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "password123" }),
+  });
+  const { id } = await res.json();
+  const [cookie] = parseSetCookie(res);
+  return { id: id as string, cookie: `token=${cookie.value}` };
+};
+
 describe("requestLogger", () => {
   it("リクエストが終わると、リクエストID・メソッド・パス・ステータス・処理時間を 1 件のアクセスログに出す", async () => {
     const info = vi.spyOn(logger, "info");
@@ -27,24 +39,19 @@ describe("requestLogger", () => {
   });
 
   it("ログイン済みのリクエストでは、アクセスログに userId も含める", async () => {
-    const signup = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const { id } = await signup.json();
-    const [cookie] = parseSetCookie(signup);
+    const alice = await signupAs("alice@example.com");
     const info = vi.spyOn(logger, "info");
 
     await app.request("/projects", {
-      headers: { Cookie: `token=${cookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
 
     expect(info).toHaveBeenCalledWith(
-      expect.objectContaining({ path: "/projects", status: 200, userId: id }),
+      expect.objectContaining({
+        path: "/projects",
+        status: 200,
+        userId: alice.id,
+      }),
       "request completed",
     );
   });

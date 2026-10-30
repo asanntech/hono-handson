@@ -3,22 +3,26 @@ import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
 import { newrelic } from "./client.ts";
 
+// ユーザーを登録し、その id と、そのユーザーとしてリクエストするための Cookie ヘッダーの値を返す
+const signupAs = async (email: string) => {
+  const res = await app.request("/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "password123" }),
+  });
+  const { id } = await res.json();
+  const [cookie] = parseSetCookie(res);
+  return { id: id as string, cookie: `token=${cookie.value}` };
+};
+
 describe("トランザクション名", () => {
   it("ルートに一致したリクエストでは、メソッドとルートのパスでトランザクション名を付ける", async () => {
-    const signup = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const [cookie] = parseSetCookie(signup);
+    const alice = await signupAs("alice@example.com");
     const createProject = await app.request("/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token=${cookie.value}`,
+        Cookie: alice.cookie,
       },
       body: JSON.stringify({ name: "Project A" }),
     });
@@ -26,7 +30,7 @@ describe("トランザクション名", () => {
     const setTransactionName = vi.spyOn(newrelic, "setTransactionName");
 
     await app.request(`/projects/${project.id}/tasks`, {
-      headers: { Cookie: `token=${cookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
 
     expect(setTransactionName).toHaveBeenCalledWith(
@@ -66,22 +70,13 @@ describe("カスタム属性", () => {
   });
 
   it("ログイン済みのリクエストでは、userId をカスタム属性に付ける", async () => {
-    const signup = await app.request("/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: "alice@example.com",
-        password: "password123",
-      }),
-    });
-    const { id } = await signup.json();
-    const [cookie] = parseSetCookie(signup);
+    const alice = await signupAs("alice@example.com");
     const addCustomAttributes = vi.spyOn(newrelic, "addCustomAttributes");
 
     await app.request("/projects", {
-      headers: { Cookie: `token=${cookie.value}` },
+      headers: { Cookie: alice.cookie },
     });
 
-    expect(addCustomAttributes).toHaveBeenCalledWith({ userId: id });
+    expect(addCustomAttributes).toHaveBeenCalledWith({ userId: alice.id });
   });
 });
