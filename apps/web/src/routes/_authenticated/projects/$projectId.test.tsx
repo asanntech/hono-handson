@@ -206,7 +206,8 @@ test("タスクが 0 件のとき、「タスクがありません」と表示�
   expect(screen.queryByRole("list")).not.toBeInTheDocument();
 });
 
-test("メンバーでないプロジェクトのタスク一覧を開いた（404）とき、「プロジェクトが見つかりません」と表示する", async () => {
+test("メンバーでないプロジェクトのタスク一覧を開いた（404）とき、再試行せずに「プロジェクトが見つかりません」と表示する", async () => {
+  let requestCount = 0;
   server.use(
     http.get("/api/auth/me", () =>
       HttpResponse.json<MeResponse>({
@@ -214,14 +215,20 @@ test("メンバーでないプロジェクトのタスク一覧を開いた（40
         email: "alice@example.com",
       }),
     ),
-    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () =>
-      HttpResponse.json({ error: { message: "Not Found" } }, { status: 404 }),
-    ),
+    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () => {
+      requestCount++;
+      return HttpResponse.json(
+        { error: { message: "Not Found" } },
+        { status: 404 },
+      );
+    }),
   );
   renderApp("/projects/00000000-0000-4000-8000-0000000000a1");
 
+  // findByText は既定で 1 秒まで待つ。再試行すると、最初の再試行（1 秒後）より前には表示されない
   expect(
     await screen.findByText("プロジェクトが見つかりません"),
   ).toBeInTheDocument();
+  expect(requestCount).toBe(1);
   expect(screen.queryByText("タスクがありません")).not.toBeInTheDocument();
 });
