@@ -52,6 +52,13 @@ describe("parseEnv", () => {
     expect(env.WEB_ORIGIN).toBe("http://localhost:5173");
   });
 
+  it("LOG_MIN_LEVEL が指定されるとその値を返し、未指定なら info を既定値にする", () => {
+    expect(
+      parseEnv({ ...requiredEnv, LOG_MIN_LEVEL: "debug" }).LOG_MIN_LEVEL,
+    ).toBe("debug");
+    expect(parseEnv(requiredEnv).LOG_MIN_LEVEL).toBe("info");
+  });
+
   it("PORT と NODE_ENV が未指定なら 3000 と development を既定値にする", () => {
     const env = parseEnv(requiredEnv);
 
@@ -95,6 +102,17 @@ describe("parseEnv", () => {
   ])("WEB_ORIGIN が %j なら検証エラーを投げる", (origin) => {
     expect(() => parseEnv({ ...requiredEnv, WEB_ORIGIN: origin })).toThrow();
   });
+
+  // pino も知らないレベルでは例外を投げるが、どの環境変数の誤りかが分からないメッセージになる。
+  // ほかの設定と同じく env の検証で弾き、LOG_MIN_LEVEL が誤っていると分かるようにする
+  it.each(["", "verbose", "INFO"])(
+    "LOG_MIN_LEVEL が pino のレベル以外の %j なら検証エラーを投げる",
+    (level) => {
+      expect(() =>
+        parseEnv({ ...requiredEnv, LOG_MIN_LEVEL: level }),
+      ).toThrow();
+    },
+  );
 
   it.each([undefined, "a".repeat(31)])(
     "JWT_SECRET が %j なら検証エラーを投げる",

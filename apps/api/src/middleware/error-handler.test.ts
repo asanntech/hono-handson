@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { requestId } from "hono/request-id";
 import { describe, expect, it, vi } from "vitest";
 import { app } from "../app.ts";
+import { logger } from "../logger.ts";
+import { newrelic } from "../newrelic/client.ts";
 import { errorHandler } from "./error-handler.ts";
 
 describe("notFoundHandler", () => {
@@ -67,8 +70,28 @@ describe("errorHandler", () => {
     });
   });
 
-  it("想定外の例外はサーバーのログに出す", async () => {
+  it("想定外の例外は、console.error ではなくリクエストID付きのエラーログに出す", async () => {
     const consoleError = vi.spyOn(console, "error");
+    const loggerError = vi.spyOn(logger, "error");
+    const error = new Error("connection to db-host:5432 failed");
+    const testApp = new Hono()
+      .use(requestId())
+      .get("/", () => {
+        throw error;
+      })
+      .onError(errorHandler);
+
+    const res = await testApp.request("/");
+
+    expect(loggerError).toHaveBeenCalledWith(
+      { err: error, requestId: res.headers.get("x-request-id") },
+      "unhandled error",
+    );
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("想定外の例外は noticeError で New Relic に送る", async () => {
+    const noticeError = vi.spyOn(newrelic, "noticeError");
     const error = new Error("connection to db-host:5432 failed");
     const testApp = new Hono()
       .get("/", () => {
@@ -78,6 +101,24 @@ describe("errorHandler", () => {
 
     await testApp.request("/");
 
-    expect(consoleError).toHaveBeenCalledWith(error);
+    expect(noticeError).toHaveBeenCalledWith(error);
   });
+
+  // 4xx はクライアントの誤りで想定内。送ると New Relic のエラーが、調査の要らないもので埋まる
+  it.each([400, 401, 403, 404, 409] as const)(
+    "HTTPException(%i) は noticeError で送らない",
+    async (status) => {
+      const noticeError = vi.spyOn(newrelic, "noticeError");
+      const testApp = new Hono()
+        .get("/", () => {
+          throw new HTTPException(status);
+        })
+        .onError(errorHandler);
+
+      const res = await testApp.request("/");
+
+      expect(res.status).toBe(status);
+      expect(noticeError).not.toHaveBeenCalled();
+    },
+  );
 });
