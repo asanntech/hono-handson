@@ -36,6 +36,27 @@ test("プロジェクト一覧を開いたとき、所属するプロジェク�
   );
 });
 
+test("プロジェクト一覧を開いたとき、見出しと一緒にプロジェクトの一覧を表示する（見出しだけの画面を出さない）", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects", () =>
+      HttpResponse.json<ProjectsResponse>([
+        { id: "00000000-0000-4000-8000-0000000000a1", name: "Website" },
+      ]),
+    ),
+  );
+  renderApp("/projects");
+
+  // 見出しが出た時点で、待たずに一覧があること。データがそろうまで画面を描画しないため
+  await screen.findByRole("heading", { name: "プロジェクト" });
+  expect(screen.getByRole("link", { name: "Website" })).toBeInTheDocument();
+});
+
 test("所属するプロジェクトが 0 件のとき、「プロジェクトがありません」と表示する", async () => {
   server.use(
     http.get("/api/auth/me", () =>
