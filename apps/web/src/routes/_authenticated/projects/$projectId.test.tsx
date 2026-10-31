@@ -54,6 +54,7 @@ test("タスク一覧を開いたとき、最初のページのタスクのタ�
 });
 
 test("タスク一覧を開いたとき、見出しと一緒に最初のページのタスクを表示する（見出しだけの画面を出さない）", async () => {
+  let requestCount = 0;
   server.use(
     http.get("/api/auth/me", () =>
       HttpResponse.json<MeResponse>({
@@ -61,8 +62,9 @@ test("タスク一覧を開いたとき、見出しと一緒に最初のペー�
         email: "alice@example.com",
       }),
     ),
-    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () =>
-      HttpResponse.json<TasksResponse>({
+    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () => {
+      requestCount++;
+      return HttpResponse.json<TasksResponse>({
         items: [
           {
             id: "00000000-0000-4000-8000-0000000000b1",
@@ -73,14 +75,16 @@ test("タスク一覧を開いたとき、見出しと一緒に最初のペー�
           },
         ],
         nextCursor: null,
-      }),
-    ),
+      });
+    }),
   );
   renderApp("/projects/00000000-0000-4000-8000-0000000000a1");
 
   // 見出しが出た時点で、待たずに一覧があること。データがそろうまで画面を描画しないため
   await screen.findByRole("heading", { name: "タスク" });
   expect(screen.getByText("Write the spec")).toBeInTheDocument();
+  // loader が取得したキャッシュで描画し、コンポーネントが取得し直さないこと。queryKey がずれると 2 回になる
+  expect(requestCount).toBe(1);
 });
 
 test("タスク一覧の末尾までスクロールしたとき、次のページを読み込んで後ろに追加する", async () => {
