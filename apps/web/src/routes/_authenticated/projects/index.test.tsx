@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { InferResponseType } from "hono/client";
 import { HttpResponse, http } from "msw";
 import { expect, test } from "vitest";
@@ -8,6 +9,10 @@ import { server } from "../../../test/server.ts";
 
 type MeResponse = InferResponseType<typeof api.auth.me.$get, 200>;
 type ProjectsResponse = InferResponseType<typeof api.projects.$get, 200>;
+type TasksResponse = InferResponseType<
+  (typeof api.projects)[":projectId"]["tasks"]["$get"],
+  200
+>;
 
 test("プロジェクト一覧を開いたとき、所属するプロジェクトの名前が、そのタスク一覧へのリンクとして並ぶ", async () => {
   server.use(
@@ -73,4 +78,32 @@ test("所属するプロジェクトが 0 件のとき、「プロジェクト�
     await screen.findByText("プロジェクトがありません"),
   ).toBeInTheDocument();
   expect(screen.queryByRole("list")).not.toBeInTheDocument();
+});
+
+test("プロジェクト一覧でプロジェクトのリンクにホバーしたとき、クリックする前にそのタスク一覧を取得する", async () => {
+  let tasksRequested = false;
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json<MeResponse>({
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "alice@example.com",
+      }),
+    ),
+    http.get("/api/projects", () =>
+      HttpResponse.json<ProjectsResponse>([
+        { id: "00000000-0000-4000-8000-0000000000a1", name: "Website" },
+      ]),
+    ),
+    http.get("/api/projects/00000000-0000-4000-8000-0000000000a1/tasks", () => {
+      tasksRequested = true;
+      return HttpResponse.json<TasksResponse>({ items: [], nextCursor: null });
+    }),
+  );
+  const user = userEvent.setup();
+  const { router } = renderApp("/projects");
+
+  await user.hover(await screen.findByRole("link", { name: "Website" }));
+
+  await waitFor(() => expect(tasksRequested).toBe(true));
+  expect(router.state.location.pathname).toBe("/projects");
 });

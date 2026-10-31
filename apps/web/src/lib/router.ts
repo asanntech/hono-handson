@@ -7,7 +7,16 @@ import { routeTree } from "../routeTree.gen.ts";
 export const createAppRouter = (
   queryClient: QueryClient,
   history?: RouterHistory,
-) => createRouter({ routeTree, context: { queryClient }, history });
+) =>
+  createRouter({
+    routeTree,
+    context: { queryClient },
+    history,
+    // リンクにホバーやフォーカスしたとき、遷移先の loader を先に実行して、クリック後の待ち時間を減らす
+    defaultPreload: "intent",
+    // データの鮮度は Query のキャッシュ（staleTime）で判断する。Router 側では先読みの結果を使い回さず、毎回 loader を呼ぶ
+    defaultPreloadStaleTime: 0,
+  });
 
 // useNavigate や Link の to に、存在するパスだけを書けるよう、ルーターの型を登録する
 declare module "@tanstack/react-router" {
